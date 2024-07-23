@@ -1,6 +1,6 @@
 class Game:
     def __init__(self) -> None:...
-    def main(self, input: str) -> str: ...
+    def main(self, input: int, user:str) -> None | str | list: ...
     def setup(self, user:str) -> str:...
     def info(self)->list[str,str, list[str] | str]:...
 
@@ -25,10 +25,12 @@ def load_game(game:Game):
         try:
             id, name, inputs = game.info()
 
-        except ValueError:
-            return "Invalid amount of values received from the info function"
-        except TypeError:
-            return "invalid types of value(s) received from the info function"
+        except ValueError as e:
+            return "Invalid amount of values received from the info function: %s"%e
+        except TypeError as e:
+            return "invalid types of value(s) received from the info function: %s"%e
+        except Exception as e:
+            return "Error in the info function: %s"%e
             
 
         if isinstance(inputs, str):
@@ -46,14 +48,8 @@ def load_game(game:Game):
         GAMES["games"][id]["game"] = game
         GAMES["games"][id]["inputs"] = inputs
         GAMES["games"][id]["name"] = name
-def redirect_key(key:str):
-    key_translator = {
-                "w":"⬆",
-                "a":"⬅",
-                "s":"⬇",
-                "d":"➡",
-            }
-    return key_translator.get(key, key)
+
+
 
 
 current_dir = os.path.dirname(__file__)
@@ -76,7 +72,14 @@ for root, dirs, files in os.walk(current_dir, topdown=False):
         else:
             break
 
-
+def redirect_key(key:str):
+    key_translator = {
+                "w":"⬆",
+                "a":"⬅",
+                "s":"⬇",
+                "d":"➡",
+            }
+    return key_translator.get(key, key)
 print("\n")
 
 user = tge.file_operations.get_appdata_path()[9:-8]
