@@ -1,6 +1,7 @@
 from math import log
 from typing import Literal
 import json, os
+from copy import deepcopy as copy
 
 
 class Game:
@@ -8,6 +9,7 @@ class Game:
         self.level = -1
         self.start_round()
         self.boarder = boarder
+        
 
     def get_level(self, level: int) -> tuple[int, int, dict]:
         
@@ -18,48 +20,53 @@ class Game:
         return data[level]
     
 
-    def load_level(self, data: dict) -> str: 
-        size = data["size"]
-        if not isinstance(size, list):
-            return "Unsupported type iterable instead list for board size:"%type(size)
-        if (len(size) != 2):
-            return "Invalid amount of board sizes: %s"%len(size)
-        if (not isinstance(size[0], int)) or (not isinstance(size[1], int)):
-            return "Board size is not a number"
-        self.generate_board(*size)
-        self.spawn_player(*data["player"])
-        for pos in data.get("triggers", []):
-            spawned = self.spawn_trigger_pad(*pos)
-            if not spawned:
-                return "Conflict while loading a trigger pad at position %s, %s"%(pos[0], pos[1])
-        for pos in data.get("boxes", []):
-            spawned = self.spawn_box(*pos)
-            if not spawned:
-                return "Conflict while loading a box at position %s, %s"%(pos[0], pos[1])
-        for pos in data.get("walls", []):
-            spawned = self.spawn_wall(*pos)
-            if not spawned:
-                return "Conflict while loading a wall pad at position %s, %s"%(pos[0], pos[1])
-        
+    def load_level(self, data: dict) -> str:
+        width = data["width"]
+        height = data["height"]
+        board = data["board"]
+
+        self.generate_board(width, height)
+
+        # Iterate over board to identify elements
+        for y in range(height):
+            for x in range(width):
+                cell = board[y][x]
+                if cell == "P":
+                    self.spawn_player(x, y)
+                elif cell == "R":
+                    if not self.spawn_reset_button(x, y):
+                        return f"Conflict while loading a reset button at position {x}, {y}"
+                elif cell == "T":
+                    if not self.spawn_trigger_pad(x, y):
+                        return f"Conflict while loading a trigger pad at position {x}, {y}"
+                elif cell == "#":
+                    if not self.spawn_wall(x, y):
+                        return f"Conflict while loading a wall at position {x}, {y}"
+
         return ""
     
+    def spawn_reset_button(self, x, y):
+        if self.get_item_at(x, y) == " ":
+            self.board[y][x] = "R"
+            return True
+        return False
 
     def start_round(self) -> bool:
+        self.player_exists = False
         self.level += 1
         data = self.get_level(self.level)
         if data == {}:
-            return True
+            return False
         errors = self.load_level(data)
         if errors:
             print(errors)
-            return True
-        return False
+            return None
+        return True
 
     def generate_board(self, width: int, height: int) -> None:
         self.width = width
         self.height = height
         board = []
-        local_board = []
         for y in range(height):
             board.append([" "] * width)
         self.board: list[list[str]] = board
@@ -83,8 +90,9 @@ class Game:
         return False
 
     def spawn_player(self, x: int, y: int) -> bool:
-
+        
         if not self.get_item_at(x, y) == "#":
+            self.player_exists = True
             self.pos_x = x
             self.pos_y = y
             self.board[y][x] = "P"
@@ -152,10 +160,16 @@ class Game:
             if not successful:
                 return False
 
+        if item == "R":
+            self.level -= 1
+            self.start_round()
+            return
+        
         if item == "T":
             self.board[target_y][target_x] = current_item.lower()
         else:
             self.board[target_y][target_x] = current_item.upper()
+        
 
         self.board[current_y][current_x] = " " if current_item.isupper() else "T"
 
@@ -166,12 +180,16 @@ class Game:
     def main(self, input: int, user: str) -> None | str | list:
         if not (input > -1 and input < 4):
             return None
+        if not self.player_exists:
+            return None
         self.move(input)
         done = self.is_board_been_completed()
         if done:
-            done = self.start_round()
-        if done:
-            return [self.get_board() + "\nBoard is Completed"]
+            not_done = self.start_round()
+            if not not_done:
+                if not_done is None:
+                    return None
+                return [self.get_board() + "\nBoard is Completed"]
         return self.get_board()
 
     def setup(self, user) -> str:
@@ -179,3 +197,8 @@ class Game:
 
     def info(self) -> list[str, str, list[str] | str]:
         return ["box_pusher", "Box Pusher", "arrows"]
+
+
+if __name__ == "__main__":
+    ...
+
