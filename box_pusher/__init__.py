@@ -2,22 +2,64 @@
 from typing import Literal
 import json, os
 from copy import deepcopy as copy
-from tge.manipulation.list_utils import decompress_list_of_lists, compress_list_of_lists
+from tge.manipulation.list_utils import decompress_list_of_lists
+
+# Reset/Start: self.start_round()
 
 
 class Game:
     def __init__(self) -> None:
-        self.level = -1
+        self.level_id = -1
         self.first_round = True
-        self.start_round()
+        self.formatting = "left"
+        self.menu_id = "main"
+        print(self.menu())
+        os.kill(os.getpid(), 9)
+
+    def format_string(
+        self, string: str, length: int, filler: str, min_buffer: int = 2
+    ) -> str:
+        if self.formatting == "center":
+            return string.center(length, filler)
+        elif self.formatting == "left":
+            return string.rjust(min_buffer + len(string), filler).ljust(length, filler)
+        elif self.formatting == "right":
+            return string.ljust(min_buffer + len(string), filler).rjust(length, filler)
+        return string
+
+    def generate_menu(self, options: list[str], width: int):
+        menu = []
+        border = self.format_string("", width, "#")
+        menu.append(border)
+        for i, arrow in enumerate("⬆➡⬅⬇"):
+            menu.append(self.format_string(" %s %s "%(arrow, options[i]), width, "#"))
+        menu.append(border)
+        return ("\n".join(menu)).replace("#", "█")
+
+    def menu(self):
+        if self.menu_id == "main":
+            return self.generate_menu(["Play", "Not implemented", "Settings", "Exit"], 25)
+        elif self.menu_id == "settings":
+            return self.generate_menu(["Main Menu", "Not implemented", "Not implemented", "Not implemented"], 25)
+
+
+    def get_all_world_names(self) -> list[dict]:
+        worlds_folder = os.path.dirname(__file__) + "/worlds"
+        json_files = [f for f in os.listdir(worlds_folder) if f.endswith(".json")]
+
+        return json_files
+
+    def get_level_order(self) -> list[str]:
+        with open(os.path.dirname(__file__) + "/levels.json") as f:
+            data = json.load(f)
+        return data["level_order"]
 
     def get_level(self, level: int) -> tuple[int, int, dict]:
 
         with open(os.path.dirname(__file__) + "/levels.json") as f:
             data = json.load(f)
-        if level >= len(data):
-            return {}
-        return data[level]
+
+        return data["levels"].get(level, {})
 
     def load_level(self, data: dict) -> str:
         width = data["width"]
@@ -34,7 +76,7 @@ class Game:
 
         self.generate_board(width, height)
         self.id_board = id_board
-        
+
         print([i for i in range(height)])
 
         player_spawn_queue = {}
@@ -42,7 +84,7 @@ class Game:
         # Iterate over board to identify elements
         for y in range(height):
             for x in range(width):
-                
+
                 cell: str = board[y][x]
                 c = cell
                 cell = cell.upper()
@@ -86,7 +128,7 @@ class Game:
 
         if position is None:
             raise BaseException(
-                f"On level {self.level} no valid player position has been evaluated. Last trigger id: {id} ({str(type(id))[8:-2]}), vs Player spawn queue: {player_spawn_queue}"
+                f"On level {self.level_id} no valid player position has been evaluated. Last trigger id: {id} ({str(type(id))[8:-2]}), vs Player spawn queue: {player_spawn_queue}"
             )
         for i in player_spawn_queue:
             self.spawn_box(player_spawn_queue[i])
@@ -127,25 +169,24 @@ class Game:
 
     def add_to_x(self, coords: tuple[int, int], value):
         return coords[0] + value, coords[1]
-    
+
     def add_to_y(self, coords: tuple[int, int], value):
         return coords[0], coords[1] + value
-    
+
     def add_coordinates(self, coords: tuple[int, int], coords2: tuple[int, int]):
-         return coords[0]+ coords2[0], coords[1]+ coords2[1]
+        return coords[0] + coords2[0], coords[1] + coords2[1]
 
     def destroy_all_connected(self, coords: tuple[int, int]):
         char = self.get_item_at(coords)
         id = self.get_id_at(coords)
         self.destroy_character(coords)
-        
+
         coords_to_check = [(1, 0), (-1, 0), (0, 1), (0, -1)]
         for coord in coords_to_check:
             new_coords = self.add_coordinates(coords, coord)
             new_char = self.get_item_at(new_coords)
             if new_char == char and self.get_id_at(new_coords) == id:
                 self.destroy_all_connected(new_coords)
-        
 
     def spawn_secret(self, coords: tuple[int, int]):
         x, y = coords
@@ -163,8 +204,11 @@ class Game:
 
     def start_round(self) -> bool:
         self.player_exists = False
-        self.level += 1
-        data = self.get_level(self.level)
+        self.level_id += 1
+        levels = self.get_level_order()
+        if self.level_id >= len(levels):
+            return False
+        data = self.get_level(levels[self.level_id])
         if data == {}:
             return False
         errors = self.load_level(data)
@@ -221,7 +265,7 @@ class Game:
             str += "\n"
         str += "#" * (self.width + 2)
 
-        return "".join([self.decode_visualization(letter) for letter in str])
+        return self.decode_visualization(str)
 
     def is_board_been_completed(self) -> bool:  # engrish
         for y in range(self.height):
@@ -231,9 +275,9 @@ class Game:
         return True
 
     def decode_visualization(self, item: str) -> str:
-        table = {"#": "█", "S": "█"}
+        table = {"#": "█", "H": "█"}
 
-        return table.get(item, item)
+        return "".join([table.get(letter, letter) for letter in item])
 
     def is_in_bounce(self, coords: tuple[int, int]) -> bool:
         if coords[0] >= self.width or coords[0] == -1:
@@ -242,12 +286,12 @@ class Game:
             return False
         return True
 
-    def get_item_at(self, coords:tuple[int, int]) -> str:
+    def get_item_at(self, coords: tuple[int, int]) -> str:
         if not self.is_in_bounce(coords):
             return "#"
         return self.board[coords[1]][coords[0]]
-    
-    def get_id_at(self, coords:tuple[int, int]) -> str:
+
+    def get_id_at(self, coords: tuple[int, int]) -> str:
         if not self.is_in_bounce(coords):
             return 0
         return self.id_board[coords[0]][coords[1]]
@@ -286,7 +330,7 @@ class Game:
             self.destroy_all_connected((target_x, target_y))
             return
         if item == "R":
-            self.level -= 1
+            self.level_id -= 1
             self.start_round()
             return
 

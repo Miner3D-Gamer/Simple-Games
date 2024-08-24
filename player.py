@@ -12,6 +12,29 @@ from copy import deepcopy
 import traceback
 import sys
 
+
+
+def request_input(*inp) -> str:
+    if inp:
+        raise NotImplementedError("Input not expected")
+    return input()
+
+def log(*msg):
+    print(*msg)
+
+def send(msg: str):
+    tge.console.clear()
+    print(msg)
+
+def send_add(msg: str):
+    send(msg)
+
+def error_message(msg: str):
+    log(msg)
+    #send(msg)
+
+
+
 GAMES = {"games": {}}
 
 
@@ -32,8 +55,11 @@ def load_inputs(inputs: str | list) -> tuple[list, str]:
 def load_game(game: Game):
     try:
         game = game()
-    except Exception as e:
-        return "Error occurred while trying to load game: %s %s" % (e, traceback.format_exc())
+    except BaseException as e:
+        return "Error occurred while trying to load game: %s %s" % (
+            e,
+            traceback.format_exc(),
+        )
 
     if not hasattr(game, "info"):
         return "Error: Missing game info -> info()"
@@ -43,7 +69,7 @@ def load_game(game: Game):
         return "Error: Missing game setup -> setup()"
     try:
         info = game.info()
-    except Exception as e:
+    except BaseException as e:
         return "Error occurred while trying to receive info from game: %s" % e
     if not isinstance(info, dict):
         return "Invalid info typing: %s" % type(info)
@@ -86,16 +112,18 @@ for root, dirs, files in os.walk(current_dir, topdown=False):
 
                 game = importlib.import_module(dir)
                 if not hasattr(game, "Game"):
-                    print("Module %s missing game" % dir)
+                    log("Module %s missing game" % dir)
                     continue
-            except Exception as e:
-                print("Error while importing %s: %s" % (dir, e))
+            except TypeError:
                 continue
-            
+            except BaseException as e:
+                log("Error while importing %s: %s" % (dir, e))
+                continue
+
             error = load_game(game.Game)
-            
+
             if error:
-                print("Error importing %s:\n%s" % (dir, error), traceback.print_exc())
+                log("Error importing %s:\n%s" % (dir, error), traceback.print_exc())
         else:
             break
 
@@ -110,19 +138,25 @@ def redirect_key(key: str):
     return key_translator.get(key, key)
 
 
-print("\n")
+
+
 
 user = tge.file_operations.get_appdata_path()[9:-8]
-print(user)
+log("Selected Username:", user)
 while True:
     while True:
-        if len(GAMES["games"]) == 1:
+        game_amount = len(GAMES["games"])
+        if game_amount == 1:
             game_id = [*GAMES["games"]][0]
             break
-        print("Select game from this list:")
-        print(*GAMES["games"])
-        print()
-        game = input()
+        if game_amount == 0:
+            send("No games available")
+            quit()
+        print_string = "Select game from this list:"
+        print_string += "\n".join(*GAMES["games"])
+        print_string += "\n"
+        send(print_string)
+        game = request_input()
         if not game:
             continue
         if game[0] == "&":
@@ -136,17 +170,21 @@ while True:
     game: Game = deepcopy(GAMES["games"][game_id]["game"])
     try:
         frame, requested_inputs = game.setup(user)
-    except Exception as e:
-        input("Error while receiving initial from from game: %s" % e)
+    except BaseException as e:
+        error_message("Error while receiving initial from from game: %s" % e)
+        request_input()
         continue
     accepted_inputs, errors = load_inputs(requested_inputs)
     if errors:
-        input("Received invalid input request while trying to load game: %s" % errors)
+        error_message("Received invalid input request while trying to load game: %s" % errors)
+        request_input()
         continue
+    send_new_frame = True
     while True:
-        tge.console.clear()
-        print(frame)
-        user_input = input()
+        if send_new_frame:
+            send(frame)
+            send_new_frame = False
+        user_input = request_input()
         if user_input.startswith("& "):
             quit()
 
@@ -165,38 +203,43 @@ while True:
         except SystemExit:
             break
         except KeyboardInterrupt:
-            input("\nForce closed the game")
+            error_message("\nForce closed the game")
+            request_input()
             break
         except BaseException as e:
-            print("\nAn error has occurred; %s" % e)
-            traceback.print_exc()
-            input("\nPress Enter to continue...")
+            error_message("\nAn error has occurred; %s \n%s" % (e, traceback.format_exc()))
+
+            request_input()
             break
 
         if output is None:
-            input("\nAn error has occurred. More is not known")
+            error_message("\nAn error has occurred. More is not known")
+            request_input()
             break
 
         if output:
             if not isinstance(output, dict):
-                input("\nInvalid return type: %s" % type(output))
+                error_message("\nInvalid return type: %s" % type(output))
+                request_input()
                 break
             action = output.get("action", "")
             new_frame = output.get("frame", "")
             if isinstance(new_frame, str) and new_frame != "":
                 frame = new_frame
+                send_new_frame = True
             if isinstance(action, str) and action != "":
                 if action == "end":
-                    tge.console.clear()
-                    input(frame)
+                    send(frame)
+                    request_input()
                     break
                 if action == "change_inputs":
                     requested_inputs = output.get("inputs", "")
                     if requested_inputs != "":
                         accepted_inputs, errors = load_inputs(accepted_inputs)
                         if errors:
-                            input(
+                            error_message(
                                 "\nReceived invalid input request when application tried changing inputs: %s"
                                 % errors
                             )
+                            request_input()
                             break

@@ -2,26 +2,50 @@ import pygame
 import os
 import json
 from tge.manipulation.list_utils import decompress_list_of_lists, compress_list_of_lists
+import random
 from copy import deepcopy as copy
 
-level_file = os.path.join(os.path.dirname(__file__), "levels.json")
+level_file = os.path.join(os.path.dirname(__file__), "worlds", "builtin.json")
+
+
+def get_new_level_name(name_length: int = 10) -> str:
+    return "".join(
+        [
+            random.choice(
+                "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+            )
+            for i in range(name_length)
+        ]
+    )
+
 
 pygame.init()
 
 # Constants
 CELL_SIZE = 50  # Size of each cell
-CHARACTERS = [i.upper() for i in [" ", "B", "T", "S", "F", "P", "R", "C", "#"]]
+CHARACTERS = [i.upper() for i in [" ", "B", "T", "H", "F", "P", "R", "C", "#"]]
 CHARACTERS.extend([i.lower() for i in CHARACTERS])
 print(CHARACTERS)
 
+
+# Add menus
+# Level Editor - Done
+
 #   - Air
+# # - Wall
 # B - Box
 # T - Trigger
-# S - Secret
+# H - Hidden
 # P - Player (Spawn)
 # R - Reset
+
 # C - Coin
 # F - Force Reposition
+# E - Explosive
+# S - Spikes
+# M - Moving
+# D - Door
+# I - Interact (Button)
 
 
 # camera types:
@@ -44,12 +68,11 @@ class Level:
             "title": "",
             "description": "",
             "difficulty": "",
-            "author": "",
             "continue_condition": {"condition": "hit_trigger_all"},
             "visual_overwrites": {},
             "trigger_exits": {},
             "force_exists": {},
-            "camera": {"type": "fixed"},
+            "camera": {"type": "fixed", "offset": (0, 0), "view_range": "full"},
         }
         if board:
             self.board = [[CHARACTERS.index(cell) for cell in row] for row in board]
@@ -211,30 +234,81 @@ class Level:
 class LevelManager:
     def __init__(self, filename):
         self.filename = filename
-        self.levels = []
-        self.current_level = 0
+        self.levels = {}  # Store levels by name
+        self.world_metadata = {}
+        self.level_order = []  # Store the order of levels by their names
+        self.current_level_id = 0
         self.load_levels()
 
     def load_levels(self):
         if os.path.exists(self.filename):
             with open(self.filename, "r") as f:
-                levels_data = json.load(f)
-                self.levels = [
-                    Level(
-                        level["width"],
-                        level["height"],
-                        decompress_list_of_lists(level["board"], level["width"]),
-                        decompress_list_of_lists(level.get("id_board"), level["width"]),
-                        level.get("metadata", {}),  # Load metadata
-                    )
-                    for level in levels_data
-                ]
-        if not self.levels:
+                levels_data: dict = json.load(f)
+                self.world_metadata: dict = levels_data.get("metadata", {})
+                self.world_name = levels_data.get("name", "New World")
+                self.world_description = levels_data.get("description", "")
+                self.level_order: list[str] = self.world_metadata.get("level_order", [])
+
+                # Load levels from the "levels" dictionary
+                levels_dict: dict[str, dict] = levels_data.get("levels", {})
+                for level_name in self.level_order:
+                    level_data = levels_dict.get(level_name)
+                    if level_data:
+                        self.levels[level_name] = Level(
+                            level_data["width"],
+                            level_data["height"],
+                            decompress_list_of_lists(
+                                level_data["board"], level_data["width"]
+                            ),
+                            decompress_list_of_lists(
+                                level_data.get("id_board"), level_data["width"]
+                            ),
+                            level_data.get("metadata", {}),
+                        )
+
+                # Ensure all levels are in the level order
+                for level_name in levels_dict.keys():
+                    if level_name == "" or level_name.isdigit():
+                        level_name = "invalid_level_name_" + get_new_level_name(10)
+                    if level_name not in self.level_order:
+                        self.level_order.append(level_name)
+                        self.levels[level_name] = Level(
+                            levels_dict[level_name]["width"],
+                            levels_dict[level_name]["height"],
+                            decompress_list_of_lists(
+                                levels_dict[level_name]["board"],
+                                levels_dict[level_name]["width"],
+                            ),
+                            decompress_list_of_lists(
+                                levels_dict[level_name].get("id_board"),
+                                levels_dict[level_name]["width"],
+                            ),
+                            levels_dict[level_name].get("metadata", {}),
+                        )
+
+                # Optionally, save updated level_order back to the file
+                self.world_metadata["level_order"] = self.level_order
+                levels_data["metadata"] = self.world_metadata
+                with open(self.filename, "w") as f:
+                    json.dump(levels_data, f, indent=4)
+
+        # Create a new level if no levels are loaded
+        if not self.level_order:
             self.create_new_level()
 
     def save_levels(self):
-        levels_data = [
-            {
+        self.world_metadata["level_order"] = self.level_order
+        self.world_metadata["name"] = self.world_name
+        self.world_metadata["description"] = self.world_description
+        levels_data = {
+            "metadata": self.world_metadata,
+            "levels": {},  # Initialize an empty dictionary for levels
+        }
+
+        # Save each level under its name in the "levels" dictionary
+        for level_name in self.level_order:
+            level = self.levels[level_name]
+            levels_data["levels"][level_name] = {
                 "width": level.width,
                 "height": level.height,
                 "board": compress_list_of_lists(
@@ -251,35 +325,41 @@ class LevelManager:
                 ),
                 "metadata": level.metadata,
             }
-            for level in self.levels
-        ]
+
         with open(self.filename, "w") as f:
             json.dump(levels_data, f)
         print("Levels saved to", self.filename)  # Debug print
 
-    def create_new_level(self):
+    def create_new_level(self, name="New Level"):
         new_level = Level(GRID_WIDTH, GRID_HEIGHT)
-        self.levels.append(new_level)
-        self.load_level(len(self.levels) - 1)
+        self.levels[name] = new_level
+        self.level_order.append(name)
+        self.load_level(len(self.level_order) - 1)
 
-    def load_level(self, index) -> None | Level:
-        if 0 <= index < len(self.levels):
-            self.current_level = index
-            print(f"Level {self.current_level} loaded.")  # Debug print
-            return self.levels[index]
-        return None
+    def load_level(self, level_name: str) -> None | Level:
+        """Load a level by its name."""
+        if level_name in self.level_order:
+            self.current_level_id = self.level_order.index(level_name)
+            print(f"Level {level_name} loaded.")  # Debug print
+            return self.levels[level_name]
+        else:
+            print(f"Level {level_name} not found.")  # Debug print
+            return None
 
     def delete_level(self, index):
-        if 0 <= index < len(self.levels):
-            deleted_level = self.levels.pop(index)
+        if 0 <= index < len(self.level_order):
+            level_name = self.level_order.pop(index)
+            deleted_level = self.levels.pop(level_name)
+
             # Adjust current_level if necessary
-            if self.current_level >= len(self.levels):
-                self.current_level = len(self.levels) - 1
-            elif self.current_level > index:
-                self.current_level -= 1
+            if self.current_level_id >= len(self.level_order):
+                self.current_level_id = len(self.level_order) - 1
+            elif self.current_level_id > index:
+                self.current_level_id -= 1
+
             # Save changes
             self.save_levels()
-            print(f"Level {index} deleted.")  # Debug print
+            print(f"Level {level_name} deleted.")  # Debug print
             return deleted_level
         else:
             print("Invalid level index. No level deleted.")  # Debug print
@@ -294,7 +374,9 @@ def is_character_valid_for_id(char: str) -> bool:
 class Game:
     def __init__(self):
         self.level_manager = LevelManager(level_file)
-        self.level = self.level_manager.load_level(0)
+        self.level = self.level_manager.load_level(
+            next(iter(self.level_manager.levels), None)
+        )
         self.font = pygame.font.SysFont(None, CELL_SIZE - 10)
         self.screen = pygame.display.set_mode(
             (self.level.width * CELL_SIZE, self.level.height * CELL_SIZE)
@@ -378,24 +460,30 @@ class Game:
                     self.level.id_board[y][x] = int(key)
 
         if key == "+":
+            next_index = (self.level_manager.current_level_id + 1) % len(
+                self.level_manager.levels
+            )
             self.level = self.level_manager.load_level(
-                (self.level_manager.current_level + 1) % len(self.level_manager.levels)
+                list(self.level_manager.levels.keys())[next_index]
             )
             self.update_screen_size()
         elif key == "-":
+            previous_index = (self.level_manager.current_level_id - 1) % len(
+                self.level_manager.levels
+            )
             self.level = self.level_manager.load_level(
-                (self.level_manager.current_level - 1) % len(self.level_manager.levels)
+                list(self.level_manager.levels.keys())[previous_index]
             )
             self.update_screen_size()
         elif key == "N":
             if shift_pressed:
-                self.level_manager.levels.append(copy(self.level))
-                self.level_manager.load_level(len(self.level_manager.levels) - 1)
+                new_name = f"copied_level_{len(self.level_manager.levels)+1}_{get_new_level_name()}"
+                self.level_manager.levels[new_name] = copy(self.level)
+                self.level_manager.load_level(new_name)
             else:
-                self.level_manager.create_new_level()
-                self.level = self.level_manager.load_level(
-                    len(self.level_manager.levels) - 1
-                )
+                new_name = f"new_level_{len(self.level_manager.levels)+1}_{get_new_level_name()}"
+                self.level_manager.create_new_level(new_name)
+                self.level = self.level_manager.load_level(new_name)
             self.update_screen_size()
 
         if key == "W":
@@ -417,16 +505,25 @@ class Game:
             self.level.resize(1, 0)
 
         elif event.key == pygame.K_DELETE and shift_pressed:
-            self.level_manager.delete_level(self.level_manager.current_level)
+            self.level_manager.delete_level(self.level_manager.current_level_id)
             if len(self.level_manager.levels) != 0:
-                self.level = self.level_manager.load_level(
-                    (self.level_manager.current_level + 1)
-                    % len(self.level_manager.levels)
+
+                next_index = (self.level_manager.current_level_id + 1) % len(
+                    self.level_manager.levels
                 )
-            else:
-                self.level_manager.create_new_level()
                 self.level = self.level_manager.load_level(
-                    len(self.level_manager.levels) - 1
+                    list(self.level_manager.levels.keys())[next_index]
+                )
+
+            else:
+                self.level_manager.create_new_level(
+                    f"new_level_{len(self.level_manager.levels)+1}_{get_new_level_name()}"
+                )
+                next_index = (self.level_manager.current_level_id - 1) % len(
+                    self.level_manager.levels
+                )
+                self.level = self.level_manager.load_level(
+                    list(self.level_manager.levels.keys())[next_index]
                 )
                 self.update_screen_size()
 
