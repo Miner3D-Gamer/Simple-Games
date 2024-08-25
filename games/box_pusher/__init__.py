@@ -1,11 +1,8 @@
-# from math import log
 from typing import Literal
 import json, os
 from copy import deepcopy as copy
 from tge.manipulation.list_utils import decompress_list_of_lists
 import ijson
-
-# Reset/Start: self.start_round()
 
 
 class Game:
@@ -71,39 +68,79 @@ class Game:
 
         return metadata
 
-    def generate_menu(self, options: list[str], width: int):
+    def generate_menu(self, options: list[str], width: int, title: str = "") -> str:
         menu = []
-        border = self.format_string("", width, "#")
+        min_buffer = 2
+
+        for i in range(len(options)):  # "⬅⬆⬇➡"
+            new = len(options[i]) + 4 + min_buffer * 2
+            if new > width:
+                width = new
+
+        border = self.format_string("", width, "#", min_buffer)
         menu.append(border)
-        for i, arrow in enumerate(options):  # "⬅⬆⬇➡"
-            menu.append(self.format_string(" %s %s " % (i + 1, options[i]), width, "#"))
+        if title:
+            menu.append(self.format_string(" %s " % title, width, "#", min_buffer))
+            menu.append(border)
+
+        for i in range(len(options)):  # "⬅⬆⬇➡"
+            menu.append(
+                self.format_string(
+                    " %s %s " % (i + 1, options[i]), width, "#", min_buffer
+                )
+            )
         menu.append(border)
         return ("\n".join(menu)).replace("#", "█")
 
     def get_menu(self):
+        menu_width = 10
         if self.menu_id == "main":
             return self.generate_menu(
-                ["Play", "Settings", "Info", "Exit"], 25
+                ["Play", "Settings", "Info", "Exit"], menu_width, "Main Menu"
             )
         elif self.menu_id == "settings":
             return self.generate_menu(
-                ["Main Menu", "Not implemented", "Not implemented", "Not implemented"],
-                25,
+                [
+                    "Main Menu",
+                    "Change Menu Style",
+                    "Not implemented",
+                    "Not implemented",
+                ],
+                menu_width,
+                "Settings",
             )
         elif self.menu_id == "world_selection":
             return self.generate_menu(
                 ["Main menu", "Next Page"]
-                + self.get_world_names_for_page(self.current_world_selection_page, 6)
+                + [
+                    "World: " + _
+                    for _ in self.get_world_names_for_page(
+                        self.current_world_selection_page, 6
+                    )
+                ]
                 + ["Previous Page"],
-                25,
+                menu_width,
+                "World Selection",
             )
         elif self.menu_id == "info":
             return self.generate_menu(
                 ["Main Menu", "Not implemented", "Not implemented", "Not implemented"],
-                25,
+                menu_width,
+                "Info",
             )
-        
-        return "Invalid menu ID (Generating Menu): %s"%self.menu_id
+        elif self.menu_id == "change_menu_style":
+            return self.generate_menu(
+                [
+                    "Back to settings",
+                    "Text padding: left",
+                    "Text padding: middle",
+                    "Text padding: right",
+                ],
+                menu_width,
+                "Change Menu Style",
+            )
+
+        return "Invalid menu ID (Generating Menu): %s" % self.menu_id
 
     def get_world_names_for_page(self, page: int, page_size: int = 10) -> list[str]:
         return self.get_all_world_names()[page * page_size : (page + 1) * page_size]
@@ -411,8 +448,8 @@ class Game:
         elif direction == 3:  # Right
             self.move_by(self.pos_x, self.pos_y, 1, 0)
 
-    def minimize(self, num: int) -> Literal[1] | Literal[-1]:
-        return num // abs(num)
+    def sign(self, num: int) -> Literal[1] | Literal[-1] | Literal[0]:
+        return 1 if num > 0 else -1 if num < 0 else 0
 
     def move_by(self, current_x, current_y, offset_x, offset_y):
 
@@ -424,10 +461,7 @@ class Game:
             return False
         if item == "B":
             successful = self.move_by(
-                target_x,
-                target_y,
-                self.minimize(offset_x) if offset_x != 0 else 0,
-                self.minimize(offset_y) if offset_y != 0 else 0,
+                target_x, target_y, self.sign(offset_x), self.sign(offset_y)
             )
             if not successful:
                 return False
@@ -481,8 +515,9 @@ class Game:
         play = lambda: change_menu("world_selection")
         settings = lambda: change_menu("settings")
         main_menu = lambda: change_menu("main")
+        change_menu_style = lambda: change_menu("change_menu_style")
 
-        def not_implemented():
+        def not_yet_implemented():
             return {"frame": ""}
 
         def exit():
@@ -514,18 +549,42 @@ class Game:
             self.current_world = self.world_name_to_file(world)
             return start()
 
+        def change_menu_style_internal(new: Literal["left", "right", "center"]):
+            self.formatting = new
+            return {"frame": self.get_menu()}
+
+        change_menu_style_to_left = lambda: change_menu_style_internal("left")
+        change_menu_style_to_right = lambda: change_menu_style_internal("right")
+        change_menu_style_to_center = lambda: change_menu_style_internal("center")
+
         info = lambda: change_menu("info")
-        
+
         happenings = {
             "main": [play, settings, info, exit],
-            "settings": [main_menu, not_implemented, not_implemented, not_implemented],
+            "settings": [
+                main_menu,
+                change_menu_style,
+                not_yet_implemented,
+                not_yet_implemented,
+            ],
             "world_selection": [
                 main_menu,
                 world_selection_next_page,
                 *[selected_world] * len(self.get_all_world_files()),
                 world_selection_previous_page,
             ],
-            "info": [main_menu, not_implemented, not_implemented, not_implemented],
+            "info": [
+                main_menu,
+                not_yet_implemented,
+                not_yet_implemented,
+                not_yet_implemented,
+            ],
+            "change_menu_style": [
+                settings,
+                change_menu_style_to_left,
+                change_menu_style_to_center,
+                change_menu_style_to_right,
+            ],
         }
         pass_func = lambda: {
             "frame": "Invalid menu ID (Menu Handler): %s" % self.menu_id,
@@ -575,7 +634,7 @@ class Game:
 
         raise ValueError("Invalid action: '%s'" % self.current_action)
 
-    def setup(self, user) -> tuple[str, str]:
+    def setup(self, info) -> tuple[str, str]:
         return self.get_menu(), "range-1-8"
 
     def info(self) -> dict:

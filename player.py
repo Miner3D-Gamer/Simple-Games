@@ -1,10 +1,18 @@
-from typing import Literal, Dict, Union
+from typing import Literal, Dict, Union, Iterable
+
+import tge.tbe
+
 
 class Game:
     def __init__(self) -> None: ...
     def main(self, input: int, user: str) -> None | dict: ...
-    def setup(self, user: str) -> tuple[str, str]: ...
-    def info(self) -> Dict[Union[Literal["name", "id"], Literal["inputs"]], str]: ...
+    def setup(
+        self,
+        info: Dict[
+            Literal["user", "interface"], Union[str, Literal["console", "discord"]]
+        ],
+    ) -> tuple[str, Iterable | Literal["arrows", "range-{min}-{max}"]]: ...
+    def info(self) -> Dict[Literal["name", "id", "inputs"], str]: ...
 
 
 import os
@@ -12,43 +20,47 @@ import tge
 import importlib
 from copy import deepcopy
 import traceback
+import sys
+
+games_folders = [os.path.join(os.path.dirname(__file__), "games")]
 
 
 def request_input(*inp) -> str:
     if inp:
         raise NotImplementedError("Input not expected")
     try:
-        inp= input()
+        inp = input()
     except ValueError:
         inp = ""
     except KeyboardInterrupt:
         log("\nForce closed the game")
         quit()
-        
-            
-    
+
     return inp
+
 
 def log(*msg):
     print(*msg)
+
 
 def send(msg: str):
     tge.console.clear()
     print(msg)
 
+
 def send_add(msg: str):
     send(msg)
 
+
 def error_message(msg: str):
     log(msg)
-    #send(msg)
-
+    # send(msg)
 
 
 GAMES = {"games": {}}
 
 
-def load_inputs(inputs: str | list) -> tuple[list, str]:
+def load_inputs(inputs: str | Iterable) -> tuple[list, str]:
     if isinstance(inputs, str):
         if inputs.startswith("range-"):
             inputs = inputs[6:].split("-")
@@ -118,28 +130,29 @@ def load_game(game: Game):
     GAMES["games"][id]["name"] = name
 
 
-current_dir = os.path.dirname(__file__)
-for root, dirs, files in os.walk(current_dir, topdown=False):
-    if root == current_dir:
-        for dir in dirs:
-            try:
-
-                game = importlib.import_module(dir)
-                if not hasattr(game, "Game"):
-                    log("Module %s missing game" % dir)
+for game_folder in games_folders:
+    sys.path.append(game_folder)
+    for root, dirs, files in os.walk(game_folder, topdown=False):
+        if root == game_folder:
+            for dir in dirs:
+                # dir = os.path.join(root, dir)
+                try:
+                    game = importlib.import_module(dir)
+                    if not hasattr(game, "Game"):
+                        log("Module %s missing game" % dir)
+                        continue
+                except TypeError:
                     continue
-            except TypeError:
-                continue
-            except BaseException as e:
-                log("Error while importing %s: %s" % (dir, e))
-                continue
+                except BaseException as e:
+                    log("Error while importing %s: %s" % (dir, e))
+                    continue
 
-            error = load_game(game.Game)
+                error = load_game(game.Game)
 
-            if error:
-                log("Error importing %s:\n%s" % (dir, error), traceback.print_exc())
-        else:
-            break
+                if error:
+                    log("Error importing %s:\n%s" % (dir, error), traceback.print_exc())
+            else:
+                break
 
 
 def redirect_key(key: str):
@@ -150,9 +163,6 @@ def redirect_key(key: str):
         "d": "➡",
     }
     return key_translator.get(key, key)
-
-
-
 
 
 user = tge.file_operations.get_appdata_path()[9:-8]
@@ -183,14 +193,19 @@ while True:
     tge.console.clear()
     game: Game = deepcopy(GAMES["games"][game_id]["game"])
     try:
-        frame, requested_inputs = game.setup(user)
+        frame, requested_inputs = game.setup({"user": user, "interface": "console"})
     except BaseException as e:
-        error_message("Error while receiving initial frame from game: %s %s" % (e, traceback.format_exc()))
+        error_message(
+            "Error while receiving initial frame from game: %s %s"
+            % (e, traceback.format_exc())
+        )
         request_input()
         continue
     accepted_inputs, errors = load_inputs(requested_inputs)
     if errors:
-        error_message("Received invalid input request while trying to load game: %s" % errors)
+        error_message(
+            "Received invalid input request while trying to load game: %s" % errors
+        )
         request_input()
         continue
     send_new_frame = True
@@ -198,11 +213,11 @@ while True:
         if send_new_frame:
             send(frame)
             send_new_frame = False
-            
+
         user_input = request_input()
         if user_input.startswith("& "):
             quit()
-        tge.console.clear_lines(user_input.count("\n")+1)
+        tge.console.clear_lines(user_input.count("\n") + 1)
         if len(user_input) != 1 or not user_input:
             continue
         if user_input in accepted_inputs:
@@ -213,7 +228,7 @@ while True:
                 input_id = accepted_inputs.index(user_input)
             else:
                 continue
-        
+
         try:
             output = game.main(input_id, user)
         except SystemExit:
@@ -223,7 +238,9 @@ while True:
             request_input()
             break
         except BaseException as e:
-            error_message("\nAn error has occurred; %s \n%s" % (e, traceback.format_exc()))
+            error_message(
+                "\nAn error has occurred; %s \n%s" % (e, traceback.format_exc())
+            )
 
             request_input()
             break
