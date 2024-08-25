@@ -1,8 +1,10 @@
+from typing import Literal, Dict, Union
+
 class Game:
     def __init__(self) -> None: ...
     def main(self, input: int, user: str) -> None | dict: ...
     def setup(self, user: str) -> tuple[str, str]: ...
-    def info(self) -> dict: ...
+    def info(self) -> Dict[Union[Literal["name", "id"], Literal["inputs"]], str]: ...
 
 
 import os
@@ -10,14 +12,22 @@ import tge
 import importlib
 from copy import deepcopy
 import traceback
-import sys
-
 
 
 def request_input(*inp) -> str:
     if inp:
         raise NotImplementedError("Input not expected")
-    return input()
+    try:
+        inp= input()
+    except ValueError:
+        inp = ""
+    except KeyboardInterrupt:
+        log("\nForce closed the game")
+        quit()
+        
+            
+    
+    return inp
 
 def log(*msg):
     print(*msg)
@@ -150,7 +160,7 @@ while True:
             game_id = [*GAMES["games"]][0]
             break
         if game_amount == 0:
-            send("No games available")
+            log("No games available")
             quit()
         print_string = "Select game from this list:"
         print_string += "\n".join(*GAMES["games"])
@@ -171,7 +181,7 @@ while True:
     try:
         frame, requested_inputs = game.setup(user)
     except BaseException as e:
-        error_message("Error while receiving initial from from game: %s" % e)
+        error_message("Error while receiving initial frame from game: %s %s" % (e, traceback.format_exc()))
         request_input()
         continue
     accepted_inputs, errors = load_inputs(requested_inputs)
@@ -184,10 +194,11 @@ while True:
         if send_new_frame:
             send(frame)
             send_new_frame = False
+            
         user_input = request_input()
         if user_input.startswith("& "):
             quit()
-
+        tge.console.clear_lines(user_input.count("\n")+1)
         if len(user_input) != 1 or not user_input:
             continue
         if user_input in accepted_inputs:
@@ -198,6 +209,7 @@ while True:
                 input_id = accepted_inputs.index(user_input)
             else:
                 continue
+        
         try:
             output = game.main(input_id, user)
         except SystemExit:
@@ -235,7 +247,7 @@ while True:
                 if action == "change_inputs":
                     requested_inputs = output.get("inputs", "")
                     if requested_inputs != "":
-                        accepted_inputs, errors = load_inputs(accepted_inputs)
+                        accepted_inputs, errors = load_inputs(requested_inputs)
                         if errors:
                             error_message(
                                 "\nReceived invalid input request when application tried changing inputs: %s"

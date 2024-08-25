@@ -70,7 +70,7 @@ class Level:
             "difficulty": "",
             "continue_condition": {"condition": "hit_trigger_all"},
             "visual_overwrites": {},
-            "trigger_exits": {},
+            "exits": {},
             "force_exists": {},
             "camera": {"type": "fixed", "offset": (0, 0), "view_range": "full"},
         }

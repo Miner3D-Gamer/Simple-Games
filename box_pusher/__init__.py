@@ -3,6 +3,7 @@ from typing import Literal
 import json, os
 from copy import deepcopy as copy
 from tge.manipulation.list_utils import decompress_list_of_lists
+import ijson
 
 # Reset/Start: self.start_round()
 
@@ -13,8 +14,10 @@ class Game:
         self.first_round = True
         self.formatting = "left"
         self.menu_id = "main"
-        print(self.menu())
-        os.kill(os.getpid(), 9)
+        self.current_action = "menu"
+        self.worlds_folder = os.path.dirname(__file__) + "/worlds"
+        self.current_world = ""
+        self.current_world_selection_page = 0
 
     def format_string(
         self, string: str, length: int, filler: str, min_buffer: int = 2
@@ -27,39 +30,146 @@ class Game:
             return string.ljust(min_buffer + len(string), filler).rjust(length, filler)
         return string
 
+    def get_metadata(self, file_path: str):
+        with open(file_path, "r") as file:
+            parser = ijson.parse(file)
+            found = False
+            metadata = {}
+            current_key = None
+            current_object = metadata
+
+            for prefix, event, value in parser:
+                if found:
+                    if event == "map_key":
+                        current_key = value
+                    elif event in ("start_map", "start_array"):
+                        new_object = {} if event == "start_map" else []
+                        if isinstance(current_object, list):
+                            current_object.append(new_object)
+                        else:
+                            current_object[current_key] = new_object
+                        current_object = new_object  # Move deeper
+                    elif event in ("end_map", "end_array"):
+                        parent_key = prefix.rsplit(".", 1)[0] if "." in prefix else None
+                        if parent_key:
+                            parent_prefix = parent_key.rsplit(".", 1)[0]
+                            current_object = (
+                                metadata
+                                if parent_prefix == "metadata"
+                                else current_object[parent_key]
+                            )
+                    elif event in ("string", "number", "boolean", "null"):
+                        if isinstance(current_object, list):
+                            current_object.append(value)
+                        else:
+                            current_object[current_key] = value
+
+                if prefix == "metadata" and event == "start_map":
+                    found = True
+                elif prefix == "metadata" and event == "end_map":
+                    break
+
+        return metadata
+
     def generate_menu(self, options: list[str], width: int):
         menu = []
         border = self.format_string("", width, "#")
         menu.append(border)
-        for i, arrow in enumerate("⬆➡⬅⬇"):
-            menu.append(self.format_string(" %s %s "%(arrow, options[i]), width, "#"))
+        for i, arrow in enumerate(options):  # "⬅⬆⬇➡"
+            menu.append(self.format_string(" %s %s " % (i + 1, options[i]), width, "#"))
         menu.append(border)
         return ("\n".join(menu)).replace("#", "█")
 
-    def menu(self):
+    def get_menu(self):
         if self.menu_id == "main":
-            return self.generate_menu(["Play", "Not implemented", "Settings", "Exit"], 25)
+            return self.generate_menu(
+                ["Play", "Settings", "Info", "Exit"], 25
+            )
         elif self.menu_id == "settings":
-            return self.generate_menu(["Main Menu", "Not implemented", "Not implemented", "Not implemented"], 25)
+            return self.generate_menu(
+                ["Main Menu", "Not implemented", "Not implemented", "Not implemented"],
+                25,
+            )
+        elif self.menu_id == "world_selection":
+            return self.generate_menu(
+                ["Main menu", "Next Page"]
+                + self.get_world_names_for_page(self.current_world_selection_page, 6)
+                + ["Previous Page"],
+                25,
+            )
+        elif self.menu_id == "info":
+            return self.generate_menu(
+                ["Main Menu", "Not implemented", "Not implemented", "Not implemented"],
+                25,
+            )
+        
+        return "Invalid menu ID: %s"%self.menu_id
 
+    def get_world_names_for_page(self, page: int, page_size: int = 10) -> list[str]:
+        return self.get_all_world_names()[page * page_size : (page + 1) * page_size]
 
-    def get_all_world_names(self) -> list[dict]:
-        worlds_folder = os.path.dirname(__file__) + "/worlds"
-        json_files = [f for f in os.listdir(worlds_folder) if f.endswith(".json")]
+    def get_world_from_page_and_index(
+        self, page: int, index: int, page_size: int = 10
+    ) -> str:
+        print(page)
+        global_index = page * page_size + index
 
-        return json_files
+        all_world_names = self.get_all_world_names()
 
-    def get_level_order(self) -> list[str]:
-        with open(os.path.dirname(__file__) + "/levels.json") as f:
+        if 0 <= global_index < len(all_world_names):
+            return all_world_names[global_index]
+        else:
+            raise IndexError("Invalid page or index")
+
+    def get_all_world_names(self) -> list[str]:
+        files = self.get_all_world_files()
+        names = []
+        for file in files:
+            metadata = self.get_metadata(os.path.join(self.worlds_folder, file))
+            name = metadata.get("name", "")
+            if not name or not isinstance(name, str):
+                name = os.path.splitext(file)[0]
+            names.append(name)
+        return names
+
+    def get_all_world_files(self) -> list[dict]:
+
+        json_files = [f for f in os.listdir(self.worlds_folder) if f.endswith(".json")]
+
+        return sorted(json_files)
+
+    def get_first_level_name(self, world: str) -> list[str]:
+        with open(os.path.join(self.worlds_folder, world)) as f:
             data = json.load(f)
-        return data["level_order"]
+        metadata = data["metadata"]
+        levels = data["levels"]
+        del data
 
-    def get_level(self, level: int) -> tuple[int, int, dict]:
+        for level in metadata["level_order"]:
+            if level in levels:
+                return level
+        else:
+            return ""
 
-        with open(os.path.dirname(__file__) + "/levels.json") as f:
+    def get_level(self, world: str, level: str) -> tuple[int, int, dict]:
+
+        with open(os.path.join(self.worlds_folder, world)) as f:
             data = json.load(f)
 
         return data["levels"].get(level, {})
+
+    def get_last_player_id(self):
+        copy_of_board = copy(self.board)
+
+        if self.first_round:
+            id = "0"
+        else:
+            previous_player_position = self.find_first_occurrence_on_board(
+                copy_of_board, "P"
+            )
+            id = self.id_board[previous_player_position[1]][previous_player_position[0]]
+
+        return id
 
     def load_level(self, data: dict) -> str:
         width = data["width"]
@@ -76,8 +186,6 @@ class Game:
 
         self.generate_board(width, height)
         self.id_board = id_board
-
-        print([i for i in range(height)])
 
         player_spawn_queue = {}
 
@@ -202,13 +310,10 @@ class Game:
             return True
         return False
 
-    def start_round(self) -> bool:
+    def start_round(self, world: str) -> bool:
         self.player_exists = False
-        self.level_id += 1
-        levels = self.get_level_order()
-        if self.level_id >= len(levels):
-            return False
-        data = self.get_level(levels[self.level_id])
+
+        data = self.get_level(world, self.level_id)
         if data == {}:
             return False
         errors = self.load_level(data)
@@ -330,8 +435,7 @@ class Game:
             self.destroy_all_connected((target_x, target_y))
             return
         if item == "R":
-            self.level_id -= 1
-            self.start_round()
+            self.start_round(self.current_world)
             return
 
         if item == "T":
@@ -345,26 +449,133 @@ class Game:
             self.pos_x, self.pos_y = target_x, target_y
         return True
 
+    def get_next_level(self):
+        player_id = self.get_last_player_id()
+        with open(os.path.join(self.worlds_folder, self.current_world), "r") as file:
+            metadata = json.load(file)["levels"][self.level_id]["metadata"]
+        exits = metadata.get("exits", {})
+        next_level_name = exits.get(str(player_id), "")
+        if isinstance(next_level_name, str):
+            return next_level_name, False
+        if isinstance(next_level_name, list):
+            raise NotImplementedError("Optional level selection not implemented")
+        if isinstance(next_level_name, int):
+            return metadata["level_order"][next_level_name], False
+        if isinstance(next_level_name, dict):
+            # world, level, the end
+            world = next_level_name.get("world", self.current_world)
+            level = next_level_name.get("level", self.level_id)
+            the_end = next_level_name.get("end", False)
+            self.current_world = world
+            return level, the_end
+
+    def world_name_to_file(self, name: str) -> str:
+        world_names = self.get_all_world_names()
+        return self.get_all_world_files()[world_names.index(name)]
+
+    def handle_menu(self, input: int):
+        def change_menu(menu_id: str):
+            self.menu_id = menu_id
+            return {"frame": self.get_menu()}
+
+        play = lambda: change_menu("world_selection")
+        settings = lambda: change_menu("settings")
+        main_menu = lambda: change_menu("main")
+
+        def not_implemented():
+            return {"frame": ""}
+
+        def exit():
+            return {
+                "frame": "##########\n#Goodbye!#\n##########".replace("#", "█"),
+                "action": "end",
+            }
+
+        def start():
+            self.current_action = "playing"
+            self.level_id = self.get_first_level_name(self.current_world)
+            self.start_round(self.current_world)
+            return {
+                "frame": self.get_board(),
+                "action": "change_inputs",
+                "inputs": "arrows",
+            }
+
+        def change_world_selection_page(value: int):
+            self.current_world_selection_page += value
+
+        world_selection_next_page = lambda: change_world_selection_page(1)
+        world_selection_previous_page = lambda: change_world_selection_page(1)
+
+        def selected_world():
+            world = self.get_world_from_page_and_index(
+                self.current_world_selection_page, input - 2, 6
+            )
+            self.current_world = self.world_name_to_file(world)
+            return start()
+
+        info = lambda: change_menu("info")
+        
+        happenings = {
+            "main": [play, settings, info, exit],
+            "settings": [main_menu, not_implemented, not_implemented, not_implemented],
+            "world_selection": [
+                main_menu,
+                world_selection_next_page,
+                *[selected_world] * len(self.get_all_world_files()),
+                world_selection_previous_page,
+            ],
+        }
+        pass_func = lambda: {
+            "frame": "Invalid menu ID: %s" % self.menu_id,
+            "action": "end",
+        }
+        try:
+            func = happenings.get(self.menu_id, [pass_func] * 4)[input]
+        except IndexError:
+            return pass_func()
+
+        return func()
+
     def main(self, input: int, user: str) -> None | dict:
-        if not (input > -1 and input < 4):
-            return None
-        if not self.player_exists:
-            return None
-        self.move(input)
-        done = self.is_board_been_completed()
-        if done:
-            not_done = self.start_round()
-            if not not_done:
-                if not_done is None:
-                    return None
-                return {
-                    "frame": self.get_board() + "\nBoard is Completed",
-                    "action": "end",
-                }
-        return {"frame": self.get_board()}
+
+        if self.current_action == "playing":
+            if not (input > -1 and input < 4):
+                return None
+            if not self.player_exists:
+                return None
+            self.move(input)
+            done = self.is_board_been_completed()
+            if done:
+                ############################################################ NEXT LEVEL
+                last_level_id = self.level_id
+                self.level_id, the_end = self.get_next_level()
+                if the_end:
+                    return {
+                        "frame": self.get_board() + "\nBoard is Completed",
+                        "action": "end",
+                    }
+                if not self.level_id:
+                    raise BaseException(
+                        "Invalid level id to load: %s loaded with id %s in level %s"
+                        % (self.level_id, self.get_last_player_id(), last_level_id)
+                    )
+                not_done = self.start_round(self.current_world)
+                if not not_done:
+                    if not_done is None:
+                        return None
+                    return {
+                        "frame": self.get_board() + "\nBoard is Completed",
+                        "action": "end",
+                    }
+            return {"frame": self.get_board()}
+        elif self.current_action == "menu":
+            return self.handle_menu(input)
+
+        raise ValueError("Invalid action: '%s'" % self.current_action)
 
     def setup(self, user) -> tuple[str, str]:
-        return self.get_board(), "arrows"
+        return self.get_menu(), [str(i + 1) for i in range(8)]
 
     def info(self) -> dict:
         return {"id": "box_pusher", "name": "Box Pusher"}

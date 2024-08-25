@@ -4,7 +4,7 @@
             "no",
             "hi"
         ],
-        "name": "A set of simple levels",
+        "name": "New World",
         "description": ""
     },
     "levels": {
@@ -36,8 +36,8 @@
                     "condition": "hit_trigger_all"
                 },
                 "visual_overwrites": {},
-                "trigger_exits": {
-                    "0": "2"
+                "exits": {
+                    "0": "hi"
                 },
                 "force_exists": {},
                 "camera": {
@@ -124,7 +124,14 @@
                     "condition": "hit_trigger_all"
                 },
                 "visual_overwrites": {},
-                "trigger_exits": {},
+                "exits": {
+                    "0": {
+                        "end": true
+                    },
+                    "1": {
+                        "end": true
+                    }
+                },
                 "force_exists": {},
                 "camera": {
                     "type": "fixed"
