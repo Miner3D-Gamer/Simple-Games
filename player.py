@@ -50,10 +50,14 @@ GAMES = {"games": {}}
 
 def load_inputs(inputs: str | list) -> tuple[list, str]:
     if isinstance(inputs, str):
-        match inputs:
-            case "arrows":
+        if inputs.startswith("range-"):
+            inputs = inputs[6:].split("-")
+            inputs = [str(x) for x in [*range(int(inputs[0]), int(inputs[1]) + 1)]]
+        else:
+            match inputs:
+                case "arrows":
 
-                inputs = [*"⬅⬆⬇➡"]
+                    inputs = [*"⬅⬆⬇➡"]
     elif not tge.tbe.is_iterable(inputs):
         return [], "Inputs are not iterable"
 

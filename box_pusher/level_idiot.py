@@ -39,6 +39,8 @@ print(CHARACTERS)
 # P - Player (Spawn)
 # R - Reset
 
+
+## ALL FOLLOWING FEATURES ARE NOT IMPLEMENTED:
 # C - Coin
 # F - Force Reposition
 # E - Explosive
@@ -46,7 +48,6 @@ print(CHARACTERS)
 # M - Moving
 # D - Door
 # I - Interact (Button)
-
 
 # camera types:
 # fixed

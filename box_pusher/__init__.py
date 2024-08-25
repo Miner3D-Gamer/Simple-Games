@@ -103,7 +103,7 @@ class Game:
                 25,
             )
         
-        return "Invalid menu ID: %s"%self.menu_id
+        return "Invalid menu ID (Generating Menu): %s"%self.menu_id
 
     def get_world_names_for_page(self, page: int, page_size: int = 10) -> list[str]:
         return self.get_all_world_names()[page * page_size : (page + 1) * page_size]
@@ -525,9 +525,10 @@ class Game:
                 *[selected_world] * len(self.get_all_world_files()),
                 world_selection_previous_page,
             ],
+            "info": [main_menu, not_implemented, not_implemented, not_implemented],
         }
         pass_func = lambda: {
-            "frame": "Invalid menu ID: %s" % self.menu_id,
+            "frame": "Invalid menu ID (Menu Handler): %s" % self.menu_id,
             "action": "end",
         }
         try:
@@ -575,7 +576,7 @@ class Game:
         raise ValueError("Invalid action: '%s'" % self.current_action)
 
     def setup(self, user) -> tuple[str, str]:
-        return self.get_menu(), [str(i + 1) for i in range(8)]
+        return self.get_menu(), "range-1-8"
 
     def info(self) -> dict:
         return {"id": "box_pusher", "name": "Box Pusher"}
