@@ -1,8 +1,5 @@
 from typing import Literal, Dict, Union, Iterable
 
-import tge.tbe
-
-
 class Game:
     def __init__(self) -> None: ...
     def main(self, input: int, user: str) -> None | dict: ...
@@ -21,8 +18,30 @@ import importlib
 from copy import deepcopy
 import traceback
 import sys
+import time
 
+debug = True
+record_input = True
+record_directory = os.path.join(os.path.dirname(__file__), "inputs")
 games_folders = [os.path.join(os.path.dirname(__file__), "games")]
+language = "en"
+
+
+
+
+
+record_file = f"{time.localtime().tm_year}-{time.localtime().tm_mon}-{time.localtime().tm_mday}-inputs-"
+
+if record_input:
+    os.makedirs(record_directory, exist_ok=True)
+
+
+
+
+
+
+def get_localization(key: str) -> str:
+    return key
 
 
 def request_input(*inp) -> str:
@@ -58,6 +77,10 @@ def error_message(msg: str):
 
 
 GAMES = {"games": {}}
+
+def add_input_to_list(input:str, current_game:str):
+    with open(os.path.join(record_directory, record_file + current_game + ".txt"), "a", encoding="utf-8") as f:
+        f.write(f"{input}\n")
 
 
 def load_inputs(inputs: str | Iterable) -> tuple[list, str]:
@@ -217,6 +240,7 @@ while True:
         user_input = request_input()
         if user_input.startswith("& "):
             quit()
+        original_user_input = user_input
         tge.console.clear_lines(user_input.count("\n") + 1)
         if len(user_input) != 1 or not user_input:
             continue
@@ -228,7 +252,9 @@ while True:
                 input_id = accepted_inputs.index(user_input)
             else:
                 continue
-
+        if record_input:
+            add_input_to_list(original_user_input, game_id)
+        start = time.time()
         try:
             output = game.main(input_id, user)
         except SystemExit:
@@ -244,6 +270,9 @@ while True:
 
             request_input()
             break
+        finally:
+            end = time.time()
+            print("Game took %s seconds to generate output" % (end - start))
 
         if output is None:
             error_message("\nAn error has occurred. More is not known")

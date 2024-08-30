@@ -1,17 +1,19 @@
 {
     "metadata": {
         "level_order": [
-            "no",
-            "hi"
+            "first",
+            "second",
+            "third"
         ],
         "name": "New World",
         "description": ""
     },
     "levels": {
-        "no": {
+        "first": {
             "width": 5,
-            "height": 3,
+            "height": 4,
             "board": [
+                "#",
                 " ",
                 [
                     " ",
@@ -23,6 +25,7 @@
                 " "
             ],
             "id_board": [
+                "0",
                 "0",
                 "0",
                 "0"
@@ -37,7 +40,7 @@
                 },
                 "visual_overwrites": {},
                 "exits": {
-                    "0": "hi"
+                    "0": "second"
                 },
                 "force_exists": {},
                 "camera": {
@@ -45,10 +48,11 @@
                 }
             }
         },
-        "hi": {
+        "second": {
             "width": 9,
-            "height": 7,
+            "height": 8,
             "board": [
+                "#",
                 [
                     6,
                     " ",
@@ -97,11 +101,13 @@
                     4,
                     "#",
                     "T",
-                    4,
-                    "#"
+                    3,
+                    "#",
+                    " "
                 ]
             ],
             "id_board": [
+                "0",
                 "0",
                 "0",
                 "0",
@@ -124,17 +130,170 @@
                     "condition": "hit_trigger_all"
                 },
                 "visual_overwrites": {},
-                "exits": {
-                    "0": {
-                        "end": true
-                    },
-                    "1": {
-                        "end": true
-                    }
-                },
+                "exits": "third",
                 "force_exists": {},
                 "camera": {
                     "type": "fixed"
+                }
+            }
+        },
+        "third": {
+            "width": 13,
+            "height": 12,
+            "board": [
+                "#",
+                [
+                    6,
+                    " ",
+                    "#",
+                    "F",
+                    3,
+                    "H",
+                    2,
+                    "#"
+                ],
+                [
+                    6,
+                    " ",
+                    "#",
+                    4,
+                    "H",
+                    2,
+                    "#"
+                ],
+                [
+                    6,
+                    " ",
+                    3,
+                    "#",
+                    2,
+                    "H",
+                    2,
+                    "#"
+                ],
+                [
+                    2,
+                    "#",
+                    "R",
+                    8,
+                    " ",
+                    2,
+                    "#"
+                ],
+                [
+                    3,
+                    "#",
+                    3,
+                    " ",
+                    "P",
+                    4,
+                    " ",
+                    2,
+                    "#"
+                ],
+                [
+                    3,
+                    "#",
+                    8,
+                    " ",
+                    2,
+                    "#"
+                ],
+                [
+                    4,
+                    "#",
+                    "P",
+                    3,
+                    "#",
+                    3,
+                    " ",
+                    2,
+                    "#"
+                ],
+                [
+                    " ",
+                    "T",
+                    " ",
+                    3,
+                    "#",
+                    "T",
+                    5,
+                    " ",
+                    "#"
+                ],
+                [
+                    " ",
+                    "B",
+                    10,
+                    " ",
+                    "#"
+                ],
+                [
+                    " ",
+                    "B",
+                    10,
+                    " ",
+                    "#"
+                ],
+                [
+                    " ",
+                    "T",
+                    10,
+                    " ",
+                    "#"
+                ]
+            ],
+            "id_board": [
+                "0",
+                [
+                    8,
+                    "0",
+                    3,
+                    "1",
+                    2,
+                    "0"
+                ],
+                [
+                    7,
+                    "0",
+                    4,
+                    "1",
+                    2,
+                    "0"
+                ],
+                "0",
+                "0",
+                [
+                    6,
+                    "0",
+                    "1",
+                    6,
+                    "0"
+                ],
+                "0",
+                "0",
+                "0",
+                "0",
+                "0",
+                "0"
+            ],
+            "metadata": {
+                "title": "",
+                "description": "",
+                "difficulty": "",
+                "continue_condition": {
+                    "condition": "hit_trigger_all"
+                },
+                "visual_overwrites": {},
+                "exits": null,
+                "force_exists": {},
+                "camera": {
+                    "type": "fixed",
+                    "offset": [
+                        0,
+                        0
+                    ],
+                    "view_range": "full"
                 }
             }
         }

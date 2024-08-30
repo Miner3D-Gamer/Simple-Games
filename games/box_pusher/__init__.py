@@ -15,6 +15,7 @@ class Game:
         self.worlds_folder = os.path.dirname(__file__) + "/worlds"
         self.current_world = ""
         self.current_world_selection_page = 0
+        self.worlds_per_page = 6
 
     def format_string(
         self, string: str, length: int, filler: str, min_buffer: int = 2
@@ -72,8 +73,8 @@ class Game:
         menu = []
         min_buffer = 2
 
-        for i in range(len(options)):  # "⬅⬆⬇➡"
-            new = len(options[i]) + 4 + min_buffer * 2
+        for i in range(len(options)+1):  # "⬅⬆⬇➡"
+            new = len([*options, title][i]) + 4 + min_buffer * 2
             if new > width:
                 width = new
 
@@ -115,12 +116,14 @@ class Game:
                 + [
                     "World: " + _
                     for _ in self.get_world_names_for_page(
-                        self.current_world_selection_page, 6
+                        self.current_world_selection_page, self.worlds_per_page
                     )
                 ]
                 + ["Previous Page"],
                 menu_width,
-                "World Selection",
+                "World Selection (%s / %s)"%(
+                    self.current_world_selection_page + 1,self.get_total_world_pages(self.worlds_per_page)
+                ),
             )
         elif self.menu_id == "info":
             return self.generate_menu(
@@ -157,6 +160,12 @@ class Game:
             return all_world_names[global_index]
         else:
             raise IndexError("Invalid page or index")
+    
+    def get_total_world_pages(self, page_size: int = 10) -> int:
+        total_world_names = len(self.get_all_world_names())
+        if page_size <= 0:
+            raise ValueError("Page size must be greater than zero.")
+        return (total_world_names + page_size - 1) // page_size
 
     def get_all_world_names(self) -> list[str]:
         files = self.get_all_world_files()
@@ -244,7 +253,7 @@ class Game:
                         return (
                             f"Conflict while loading a trigger pad at position {x}, {y}"
                         )
-                elif cell == "S":
+                elif cell == "H":
                     if not self.spawn_secret((x, y)):
                         return (
                             f"Conflict while loading a secret tile at position {x}, {y}"
@@ -330,13 +339,15 @@ class Game:
         for coord in coords_to_check:
             new_coords = self.add_coordinates(coords, coord)
             new_char = self.get_item_at(new_coords)
-            if new_char == char and self.get_id_at(new_coords) == id:
+            new_id = self.get_id_at(new_coords)
+            print(new_id, id)
+            if new_char == char and new_id == id:
                 self.destroy_all_connected(new_coords)
 
     def spawn_secret(self, coords: tuple[int, int]):
         x, y = coords
         if self.get_item_at((x, y)) == " ":
-            self.board[y][x] = "S"
+            self.board[y][x] = "H"
             return True
         return False
 
@@ -433,9 +444,9 @@ class Game:
             return "#"
         return self.board[coords[1]][coords[0]]
 
-    def get_id_at(self, coords: tuple[int, int]) -> str:
+    def get_id_at(self, coords: tuple[int, int]) -> int:
         if not self.is_in_bounce(coords):
-            return 0
+            return -1
         return self.id_board[coords[0]][coords[1]]
 
     def move(self, direction: int) -> None:
@@ -465,7 +476,7 @@ class Game:
             )
             if not successful:
                 return False
-        if item == "S":
+        if item == "H":
             self.destroy_all_connected((target_x, target_y))
             return
         if item == "R":
@@ -488,20 +499,30 @@ class Game:
         with open(os.path.join(self.worlds_folder, self.current_world), "r") as file:
             metadata = json.load(file)["levels"][self.level_id]["metadata"]
         exits = metadata.get("exits", {})
-        next_level_name = exits.get(str(player_id), "")
-        if isinstance(next_level_name, str):
-            return next_level_name, False
-        if isinstance(next_level_name, list):
+        if isinstance(exits, dict):
+            next_level_name = exits.get(str(player_id), "")
+            if isinstance(next_level_name, str):
+                return next_level_name, False
+            if isinstance(next_level_name, list):
+                raise NotImplementedError("Optional level selection not implemented")
+            if isinstance(next_level_name, int):
+                return metadata["level_order"][next_level_name], False
+            if isinstance(next_level_name, dict):
+                # world, level, the end
+                world = next_level_name.get("world", self.current_world)
+                level = next_level_name.get("level", self.level_id)
+                the_end = next_level_name.get("end", False)
+                self.current_world = world
+                return level, the_end
+        if isinstance(exits, str):
+            return exits, False
+        if isinstance(exits, list):
             raise NotImplementedError("Optional level selection not implemented")
-        if isinstance(next_level_name, int):
-            return metadata["level_order"][next_level_name], False
-        if isinstance(next_level_name, dict):
-            # world, level, the end
-            world = next_level_name.get("world", self.current_world)
-            level = next_level_name.get("level", self.level_id)
-            the_end = next_level_name.get("end", False)
-            self.current_world = world
-            return level, the_end
+        if isinstance(exits, int):
+            return metadata["level_order"][exits], False
+        if exits is None:
+            return "", True
+        raise ValueError("Unrecognized exit type")
 
     def world_name_to_file(self, name: str) -> str:
         world_names = self.get_all_world_names()
@@ -538,13 +559,18 @@ class Game:
 
         def change_world_selection_page(value: int):
             self.current_world_selection_page += value
+            pages = self.get_total_world_pages(self.worlds_per_page)
+            if self.current_world_selection_page < 0:
+                self.current_world_selection_page = (pages + 1)-self.current_world_selection_page
+            self.current_world_selection_page %= pages
+            return {"frame": self.get_menu()}
 
         world_selection_next_page = lambda: change_world_selection_page(1)
         world_selection_previous_page = lambda: change_world_selection_page(1)
 
         def selected_world():
             world = self.get_world_from_page_and_index(
-                self.current_world_selection_page, input - 2, 6
+                self.current_world_selection_page, input - 2, self.worlds_per_page
             )
             self.current_world = self.world_name_to_file(world)
             return start()
@@ -617,7 +643,7 @@ class Game:
                     }
                 if not self.level_id:
                     raise BaseException(
-                        "Invalid level id to load: %s loaded with id %s in level %s"
+                        "Invalid level id to load: '%s' loaded with id %s in level '%s'"
                         % (self.level_id, self.get_last_player_id(), last_level_id)
                     )
                 not_done = self.start_round(self.current_world)

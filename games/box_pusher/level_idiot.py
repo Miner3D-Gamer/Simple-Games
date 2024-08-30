@@ -328,7 +328,7 @@ class LevelManager:
             }
 
         with open(self.filename, "w") as f:
-            json.dump(levels_data, f)
+            json.dump(levels_data, f, indent=4)
         print("Levels saved to", self.filename)  # Debug print
 
     def create_new_level(self, name="New Level"):
