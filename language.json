@@ -1,6 +1,8 @@
 {
     "en": {
         "language": "English",
-        "keys": {}
+        "keys": {
+            "input.force_close": "\nForce closed the game"
+        }
     }
 }

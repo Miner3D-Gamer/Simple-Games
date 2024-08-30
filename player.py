@@ -1,15 +1,63 @@
-from typing import Literal, Dict, Union, Iterable
+from typing import Literal, Dict, Union, Iterable, Tuple, List, Optional
+
+allowed_inputs = ["arrows", "range-{min}-{max}"]
+
 
 class Game:
-    def __init__(self) -> None: ...
-    def main(self, input: int, user: str) -> None | dict: ...
+    def __init__(self) -> None:
+        "The logic that would usually go here is moved to the 'setup' function"
+
+    def main(self, input: int, user: str) -> Union[
+        None,
+        Dict[
+            Union[Literal["frame"], Optional[Literal["action", "inputs"]]],
+            Union[
+                str,
+                Optional[Literal["end", "change_inputs"]],
+                Optional[Union[Iterable, Literal["arrows", "range-{min}-{max}"]]],
+            ],
+        ],
+    ]:
+        """
+        A function called for every frame
+
+        None: An error occurred yet instead of raising an error, None is returned to signalize that the game loop should be stopped
+
+        Actions:
+            "end": Displays the last frame and ends the game loop
+
+            "change_inputs": Requires another variable neighboring 'actions'; 'inputs'. Changes the inputs if possible
+
+            "error": Displays the given frame yet also signalized that something went wrong
+
+        """
+
     def setup(
         self,
         info: Dict[
-            Literal["user", "interface"], Union[str, Literal["console", "discord"]]
+            Literal[
+                "user",
+                "interface",
+                "language",
+            ],
+            Union[
+                str,
+                Literal["console", "discord"],
+                str,
+            ],
         ],
-    ) -> tuple[str, Iterable | Literal["arrows", "range-{min}-{max}"]]: ...
-    def info(self) -> Dict[Literal["name", "id", "inputs"], str]: ...
+    ) -> Tuple[
+        str,
+        Union[
+            Iterable,
+            Literal["arrows", "range-{min}-{max}"],
+            Dict[Literal["receive_last_frame"], bool],
+        ],
+    ]:
+        "The custom replacement to __init__"
+
+    def info(self) -> Dict[Literal["name", "id", "description"], str]:
+        "Before the game is run, this function is called when adding the game to the library in order to give the user a preview of what's to expect"
 
 
 import os
@@ -19,40 +67,52 @@ from copy import deepcopy
 import traceback
 import sys
 import time
+import json
 
 debug = True
 record_input = True
-record_directory = os.path.join(os.path.dirname(__file__), "inputs")
-games_folders = [os.path.join(os.path.dirname(__file__), "games")]
+current_folder = os.path.dirname(__file__)
+record_directory = os.path.join(current_folder, "inputs")
+games_folders = [os.path.join(current_folder, "games")]
+language_file = os.path.join(current_folder, "language.json")
 language = "en"
 
 
-
-
-
 record_file = f"{time.localtime().tm_year}-{time.localtime().tm_mon}-{time.localtime().tm_mday}-inputs-"
+
+record_path = os.path.join(record_directory, record_file)
+
 
 if record_input:
     os.makedirs(record_directory, exist_ok=True)
 
 
+current_language = "en"
+current_language_keys = {}
 
 
+def load_language(language):
+    global current_language, current_language_keys
+    with open(language_file, "r") as f:
+        languages: dict = json.load(f)
+        keys: Union[dict, None] = languages.get(language)
+        if keys is None:
+            return
+        current_language = language
+        current_language_keys = keys.get("keys", {})
 
 
 def get_localization(key: str) -> str:
-    return key
+    return current_language_keys.get(key, key)
 
 
-def request_input(*inp) -> str:
-    if inp:
-        raise NotImplementedError("Input not expected")
+def request_input() -> str:
     try:
         inp = input()
     except ValueError:
         inp = ""
     except KeyboardInterrupt:
-        log("\nForce closed the game")
+        log(get_localization("input.force_close"))
         quit()
 
     return inp
@@ -78,12 +138,15 @@ def error_message(msg: str):
 
 GAMES = {"games": {}}
 
-def add_input_to_list(input:str, current_game:str):
-    with open(os.path.join(record_directory, record_file + current_game + ".txt"), "a", encoding="utf-8") as f:
+
+def add_input_to_list(input: str, current_game: str):
+    with open(
+        os.path.join(record_path + current_game + ".txt"), "a", encoding="utf-8"
+    ) as f:
         f.write(f"{input}\n")
 
 
-def load_inputs(inputs: str | Iterable) -> tuple[list, str]:
+def load_inputs(inputs: Union[str, Iterable]) -> Tuple[list, str]:
     if isinstance(inputs, str):
         if inputs.startswith("range-"):
             inputs = inputs[6:].split("-")
@@ -188,54 +251,16 @@ def redirect_key(key: str):
     return key_translator.get(key, key)
 
 
-user = tge.file_operations.get_appdata_path()[9:-8]
-log("Selected Username:", user)
-while True:
-    while True:
-        game_amount = len(GAMES["games"])
-        if game_amount == 1:
-            game_id = [*GAMES["games"]][0]
-            break
-        if game_amount == 0:
-            log("No games available")
-            quit()
-        print_string = "Select game from this list:"
-        print_string += "\n".join(*GAMES["games"])
-        print_string += "\n"
-        send(print_string)
-        game = request_input()
-        if not game:
-            continue
-        if game[0] == "&":
-            quit()
-        game_id = tge.tbe.strict_autocomplete(game, GAMES["games"])
-        if not isinstance(game_id, str):
-            tge.console.clear()
-            continue
-        break
-    tge.console.clear()
-    game: Game = deepcopy(GAMES["games"][game_id]["game"])
-    try:
-        frame, requested_inputs = game.setup({"user": user, "interface": "console"})
-    except BaseException as e:
-        error_message(
-            "Error while receiving initial frame from game: %s %s"
-            % (e, traceback.format_exc())
-        )
-        request_input()
-        continue
-    accepted_inputs, errors = load_inputs(requested_inputs)
-    if errors:
-        error_message(
-            "Received invalid input request while trying to load game: %s" % errors
-        )
-        request_input()
-        continue
+def run_game(game: Game, game_id: str, frame: str, accepted_inputs: list):
     send_new_frame = True
+    # last_frame = ""
+    end, start = 0, 0
     while True:
+
         if send_new_frame:
             send(frame)
             send_new_frame = False
+            print("Game took %s seconds to generate output\n" % (end - start))
 
         user_input = request_input()
         if user_input.startswith("& "):
@@ -272,7 +297,6 @@ while True:
             break
         finally:
             end = time.time()
-            print("Game took %s seconds to generate output" % (end - start))
 
         if output is None:
             error_message("\nAn error has occurred. More is not known")
@@ -287,8 +311,9 @@ while True:
             action = output.get("action", "")
             new_frame = output.get("frame", "")
             if isinstance(new_frame, str) and new_frame != "":
-                frame = new_frame
-                send_new_frame = True
+                if frame != new_frame:
+                    frame = new_frame
+                    send_new_frame = True
             if isinstance(action, str) and action != "":
                 if action == "end":
                     send(frame)
@@ -305,3 +330,60 @@ while True:
                             )
                             request_input()
                             break
+
+
+def select_game(game_id) -> Tuple[str, str, Game]:
+    global GAMES
+    game: Game = deepcopy(GAMES["games"][game_id]["game"])
+    try:
+        frame, requested_inputs = game.setup({"user": user, "interface": "console"})
+    except BaseException as e:
+        error_message(
+            "Error while receiving initial frame from game: %s %s"
+            % (e, traceback.format_exc())
+        )
+        request_input()
+        return "", "", ""
+    accepted_inputs, errors = load_inputs(requested_inputs)
+    if errors:
+        error_message(
+            "Received invalid input request while trying to load game: %s" % errors
+        )
+        request_input()
+        return "", "", ""
+    return frame, accepted_inputs, game
+
+
+load_language(language)
+
+user = tge.file_operations.get_appdata_path()[9:-8]
+
+while True:
+    while True:
+        log("Selected Username:", user)
+        game_amount = len(GAMES["games"])
+        if game_amount == 1:
+            game_id = [*GAMES["games"]][0]
+            break
+        if game_amount == 0:
+            log("No games available")
+            quit()
+        print_string = "Select game from this list:"
+        print_string += "\n".join(*GAMES["games"])
+        print_string += "\n"
+        send(print_string)
+        game = request_input()
+        if not game:
+            continue
+        if game[0] == "&":
+            quit()
+        game_id = tge.tbe.strict_autocomplete(game, GAMES["games"])
+        if not isinstance(game_id, str):
+            tge.console.clear()
+            continue
+        break
+    tge.console.clear()
+    first_frame, inputs, game = select_game(game_id)
+    if not first_frame:
+        continue
+    run_game(game, game_id, first_frame, inputs)

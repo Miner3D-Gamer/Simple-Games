@@ -73,7 +73,7 @@ class Game:
         menu = []
         min_buffer = 2
 
-        for i in range(len(options)+1):  # "⬅⬆⬇➡"
+        for i in range(len(options) + 1):  # "⬅⬆⬇➡"
             new = len([*options, title][i]) + 4 + min_buffer * 2
             if new > width:
                 width = new
@@ -121,8 +121,10 @@ class Game:
                 ]
                 + ["Previous Page"],
                 menu_width,
-                "World Selection (%s / %s)"%(
-                    self.current_world_selection_page + 1,self.get_total_world_pages(self.worlds_per_page)
+                "World Selection (%s / %s)"
+                % (
+                    self.current_world_selection_page + 1,
+                    self.get_total_world_pages(self.worlds_per_page),
                 ),
             )
         elif self.menu_id == "info":
@@ -160,7 +162,7 @@ class Game:
             return all_world_names[global_index]
         else:
             raise IndexError("Invalid page or index")
-    
+
     def get_total_world_pages(self, page_size: int = 10) -> int:
         total_world_names = len(self.get_all_world_names())
         if page_size <= 0:
@@ -561,7 +563,9 @@ class Game:
             self.current_world_selection_page += value
             pages = self.get_total_world_pages(self.worlds_per_page)
             if self.current_world_selection_page < 0:
-                self.current_world_selection_page = (pages + 1)-self.current_world_selection_page
+                self.current_world_selection_page = (
+                    pages + 1
+                ) - self.current_world_selection_page
             self.current_world_selection_page %= pages
             return {"frame": self.get_menu()}
 
@@ -664,7 +668,11 @@ class Game:
         return self.get_menu(), "range-1-8"
 
     def info(self) -> dict:
-        return {"id": "box_pusher", "name": "Box Pusher"}
+        return {
+            "id": "box_pusher",
+            "name": "Box Pusher",
+            "description": "A simple puzzle game",
+        }
 
 
 if __name__ == "__main__":
