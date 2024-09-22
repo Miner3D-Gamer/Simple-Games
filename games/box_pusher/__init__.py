@@ -1,4 +1,5 @@
-from typing import Literal
+from typing import Literal, Dict, Union, Iterable, Tuple, List, Optional
+
 import json, os
 from copy import deepcopy as copy
 from tge.manipulation.list_utils import decompress_list_of_lists
@@ -530,15 +531,17 @@ class Game:
         world_names = self.get_all_world_names()
         return self.get_all_world_files()[world_names.index(name)]
 
-    def handle_menu(self, input: int):
-        def change_menu(menu_id: str):
-            self.menu_id = menu_id
-            return {"frame": self.get_menu()}
+    def change_menu(self, menu_id: str):
+        self.current_action = "menu"
+        self.menu_id = menu_id
+        return {"frame": self.get_menu()}
 
-        play = lambda: change_menu("world_selection")
-        settings = lambda: change_menu("settings")
-        main_menu = lambda: change_menu("main")
-        change_menu_style = lambda: change_menu("change_menu_style")
+    def handle_menu(self, input: int):
+
+        play = lambda: self.change_menu("world_selection")
+        settings = lambda: self.change_menu("settings")
+        main_menu = lambda: self.change_menu("main")
+        change_menu_style = lambda: self.change_menu("change_menu_style")
 
         def not_yet_implemented():
             return {"frame": ""}
@@ -570,7 +573,7 @@ class Game:
             return {"frame": self.get_menu()}
 
         world_selection_next_page = lambda: change_world_selection_page(1)
-        world_selection_previous_page = lambda: change_world_selection_page(1)
+        world_selection_previous_page = lambda: change_world_selection_page(-1)
 
         def selected_world():
             world = self.get_world_from_page_and_index(
@@ -587,7 +590,7 @@ class Game:
         change_menu_style_to_right = lambda: change_menu_style_internal("right")
         change_menu_style_to_center = lambda: change_menu_style_internal("center")
 
-        info = lambda: change_menu("info")
+        info = lambda: self.change_menu("info")
 
         happenings = {
             "main": [play, settings, info, exit],
@@ -627,6 +630,11 @@ class Game:
 
         return func()
 
+    def exit_world(self):
+        next = self.change_menu("world_selection")
+        next.update({"action": "change_inputs", "inputs": "range-1-8"})
+        return next
+
     def main(self, input: int, user: str) -> None | dict:
 
         if self.current_action == "playing":
@@ -641,10 +649,7 @@ class Game:
                 last_level_id = self.level_id
                 self.level_id, the_end = self.get_next_level()
                 if the_end:
-                    return {
-                        "frame": self.get_board() + "\nBoard is Completed",
-                        "action": "end",
-                    }
+                    return self.exit_world()
                 if not self.level_id:
                     raise BaseException(
                         "Invalid level id to load: '%s' loaded with id %s in level '%s'"
@@ -654,17 +659,33 @@ class Game:
                 if not not_done:
                     if not_done is None:
                         return None
-                    return {
-                        "frame": self.get_board() + "\nBoard is Completed",
-                        "action": "end",
-                    }
+                    return self.exit_world()
+
             return {"frame": self.get_board()}
         elif self.current_action == "menu":
             return self.handle_menu(input)
 
         raise ValueError("Invalid action: '%s'" % self.current_action)
 
-    def setup(self, info) -> tuple[str, str]:
+    def setup(self, info: Dict[
+            Literal[
+                "user",
+                "interface",
+                "language",
+            ],
+            Union[
+                str,
+                Literal["console", "discord"],
+                str,
+            ],
+        ],) -> Tuple[
+        str,
+        Union[
+            Iterable,
+            Literal["arrows", "range-{min}-{max}"],
+        ],
+        Dict[Literal["receive_last_frame"], bool],
+    ]:
         return self.get_menu(), "range-1-8"
 
     def info(self) -> dict:

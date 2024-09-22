@@ -1,5 +1,7 @@
 from typing import Literal, Dict, Union, Iterable, Tuple, List, Optional
 
+import tge.tbe
+
 allowed_inputs = ["arrows", "range-{min}-{max}"]
 
 
@@ -21,7 +23,7 @@ class Game:
         """
         A function called for every frame
 
-        None: An error occurred yet instead of raising an error, None is returned to signalize that the game loop should be stopped
+        None: Something went wrong yet instead of raising an error, None can be returned to signalize that the game loop should be stopped
 
         Actions:
             "end": Displays the last frame and ends the game loop
@@ -51,8 +53,8 @@ class Game:
         Union[
             Iterable,
             Literal["arrows", "range-{min}-{max}"],
-            Dict[Literal["receive_last_frame"], bool],
         ],
+        Optional[Dict[Literal["receive_last_frame"], bool]],
     ]:
         "The custom replacement to __init__"
 
@@ -76,6 +78,7 @@ record_directory = os.path.join(current_folder, "inputs")
 games_folders = [os.path.join(current_folder, "games")]
 language_file = os.path.join(current_folder, "language.json")
 language = "en"
+timeout = 5  # seconds
 
 
 record_file = f"{time.localtime().tm_year}-{time.localtime().tm_mon}-{time.localtime().tm_mday}-inputs-"
@@ -112,7 +115,7 @@ def request_input() -> str:
     except ValueError:
         inp = ""
     except KeyboardInterrupt:
-        log(get_localization("input.force_close"))
+        send(get_localization("input.force_close"))
         quit()
 
     return inp
@@ -125,10 +128,6 @@ def log(*msg):
 def send(msg: str):
     tge.console.clear()
     print(msg)
-
-
-def send_add(msg: str):
-    send(msg)
 
 
 def error_message(msg: str):
@@ -146,7 +145,16 @@ def add_input_to_list(input: str, current_game: str):
         f.write(f"{input}\n")
 
 
-def load_inputs(inputs: Union[str, Iterable]) -> Tuple[list, str]:
+def load_inputs(inputs: Union[str, Iterable, Tuple]) -> Tuple[list, str]:
+    if isinstance(inputs, tuple):
+        new_inputs = []
+        for input in inputs:
+            internal_inputs, err = load_inputs(input)
+            if err:
+                return [], err
+            new_inputs.extend(internal_inputs)
+
+        return new_inputs, ""
     if isinstance(inputs, str):
         if inputs.startswith("range-"):
             inputs = inputs[6:].split("-")
@@ -166,12 +174,14 @@ def load_inputs(inputs: Union[str, Iterable]) -> Tuple[list, str]:
 
 def load_game(game: Game):
     try:
-        game = game()
+        game = tge.tbe.run_function_with_timeout(game, timeout)
     except BaseException as e:
         return "Error occurred while trying to load game: %s %s" % (
             e,
             traceback.format_exc(),
         )
+    if game is tge.tbe.TimeoutResult:
+        return "Error: Initial timeout"
 
     if not hasattr(game, "info"):
         return "Error: Missing game info -> info()"
@@ -180,9 +190,11 @@ def load_game(game: Game):
     if not hasattr(game, "setup"):
         return "Error: Missing game setup -> setup()"
     try:
-        info = game.info()
+        info = tge.tbe.run_function_with_timeout(game.info, timeout)
     except BaseException as e:
         return "Error occurred while trying to receive info from game: %s" % e
+    if info is tge.tbe.TimeoutResult:
+        return "Error: Info timeout"
     if not isinstance(info, dict):
         return "Invalid info typing: %s" % type(info)
     name = info.get("name", "")
@@ -251,16 +263,18 @@ def redirect_key(key: str):
     return key_translator.get(key, key)
 
 
-def run_game(game: Game, game_id: str, frame: str, accepted_inputs: list):
+def run_game(
+    game: Game, game_id: str, frame: str, accepted_inputs: list, give_old_frame: bool
+):
     send_new_frame = True
     # last_frame = ""
     end, start = 0, 0
     while True:
-
+        old_frame = ""
         if send_new_frame:
-            send(frame)
+            send(frame + "\nValid inputs: %s" % accepted_inputs)
             send_new_frame = False
-            print("Game took %s seconds to generate output\n" % (end - start))
+            log("Game took %s seconds to generate output\n" % (end - start))
 
         user_input = request_input()
         if user_input.startswith("& "):
@@ -280,8 +294,12 @@ def run_game(game: Game, game_id: str, frame: str, accepted_inputs: list):
         if record_input:
             add_input_to_list(original_user_input, game_id)
         start = time.time()
+
+        inputs = [input_id, user] + ([old_frame] if give_old_frame else [])
+        print(inputs)
         try:
-            output = game.main(input_id, user)
+            output = tge.tbe.run_function_with_timeout(game.main, timeout, *inputs)
+            # output = game.main(input_id, user)
         except SystemExit:
             break
         except KeyboardInterrupt:
@@ -298,6 +316,11 @@ def run_game(game: Game, game_id: str, frame: str, accepted_inputs: list):
         finally:
             end = time.time()
 
+        if output is tge.tbe.TimeoutResult:
+            error_message("\nMain function timed out")
+            request_input()
+            break
+
         if output is None:
             error_message("\nAn error has occurred. More is not known")
             request_input()
@@ -312,17 +335,20 @@ def run_game(game: Game, game_id: str, frame: str, accepted_inputs: list):
             new_frame = output.get("frame", "")
             if isinstance(new_frame, str) and new_frame != "":
                 if frame != new_frame:
+                    old_frame = frame
                     frame = new_frame
                     send_new_frame = True
             if isinstance(action, str) and action != "":
                 if action == "end":
-                    send(frame)
+                    if old_frame != new_frame:
+                        send(frame)
                     request_input()
                     break
                 if action == "change_inputs":
                     requested_inputs = output.get("inputs", "")
                     if requested_inputs != "":
                         accepted_inputs, errors = load_inputs(requested_inputs)
+
                         if errors:
                             error_message(
                                 "\nReceived invalid input request when application tried changing inputs: %s"
@@ -336,29 +362,47 @@ def select_game(game_id) -> Tuple[str, str, Game]:
     global GAMES
     game: Game = deepcopy(GAMES["games"][game_id]["game"])
     try:
-        frame, requested_inputs = game.setup({"user": user, "interface": "console"})
+        result: Tuple[
+            str,
+            Union[
+                Iterable,
+                Literal["arrows", "range-{min}-{max}"],
+            ],
+            Dict[Literal["receive_last_frame"], bool],
+        ] = tge.tbe.run_function_with_timeout(
+            game.setup, timeout, {"user": user, "interface": "console"}
+        )
     except BaseException as e:
         error_message(
             "Error while receiving initial frame from game: %s %s"
             % (e, traceback.format_exc())
         )
         request_input()
-        return "", "", ""
+        return "", "", "", ""
+    if result is tge.tbe.TimeoutResult:
+        error_message("Timeout while setup")
+        request_input()
+        return "", "", "", ""
+    things = len(result)
+    if things == 3:
+        frame, requested_inputs, settings = result
+    elif things == 2:
+        frame, requested_inputs = result
+        settings = {}
+    else:
+        return "", "", "", ""
+
     accepted_inputs, errors = load_inputs(requested_inputs)
     if errors:
         error_message(
             "Received invalid input request while trying to load game: %s" % errors
         )
         request_input()
-        return "", "", ""
-    return frame, accepted_inputs, game
+        return "", "", "", ""
+    return frame, accepted_inputs, game, bool(settings.get("receive_last_frame", False))
 
 
-load_language(language)
-
-user = tge.file_operations.get_appdata_path()[9:-8]
-
-while True:
+def select_game_from_user(user: str):
     while True:
         log("Selected Username:", user)
         game_amount = len(GAMES["games"])
@@ -366,10 +410,10 @@ while True:
             game_id = [*GAMES["games"]][0]
             break
         if game_amount == 0:
-            log("No games available")
+            send("No games available")
             quit()
-        print_string = "Select game from this list:"
-        print_string += "\n".join(*GAMES["games"])
+        print_string = "Select game from this list:\n"
+        print_string += "\n".join(GAMES["games"])
         print_string += "\n"
         send(print_string)
         game = request_input()
@@ -382,8 +426,18 @@ while True:
             tge.console.clear()
             continue
         break
+    return game_id
+
+
+load_language(language)
+
+user = tge.file_operations.get_appdata_path()[9:-8]
+
+while True:
+    game_id = select_game_from_user(user)
+    print(game_id)
     tge.console.clear()
-    first_frame, inputs, game = select_game(game_id)
+    first_frame, inputs, game, give_old_frame = select_game(game_id)
     if not first_frame:
         continue
-    run_game(game, game_id, first_frame, inputs)
+    run_game(game, game_id, first_frame, inputs, give_old_frame)
