@@ -1,0 +1,15 @@
+{
+    "language": {
+        "en": "English",
+        "de": "Englisch"
+    },
+    "keys": {
+        "input.force_close": "Force closed the game",
+        "game_selection.individual_game": ">- %s (%s)",
+        "game_selection.game_list": "Select game from this list:",
+        "exit.keyboard_interrupt": "Force closed the game",
+        "game.exception.unhandled": "An error has occurred; %s \n%s",
+        "game.debug.frame_time": "Game took %s seconds to generate output",
+        "insufficient_arguments": "Not enough arguments"
+    }
+}

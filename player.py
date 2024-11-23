@@ -21,8 +21,8 @@ record_input = False
 current_folder = os.path.dirname(__file__)
 record_directory = os.path.join(current_folder, "inputs")
 games_folders = [os.path.join(current_folder, "games")]
-language_file = os.path.join(current_folder, "language.json")
-language = "de"
+language_folder = os.path.join(current_folder, "language")
+language = "en"
 timeout = 5  # seconds
 user = tge.tbe.get_username()
 
@@ -35,19 +35,21 @@ if record_input:
     os.makedirs(record_directory, exist_ok=True)
 
 
-current_language = "en"
-current_language_keys: Dict[str, Any] = {}
+current_language_keys: Dict[str, str] = {}
 
 
 def load_language(language: str)->None:
     global current_language, current_language_keys
-    with open(language_file, "r", encoding="utf-8") as f:
-        languages: Dict[str, Any] = json.load(f)
-        keys: Union[Dict[str, Any], None] = languages.get(language)
+    requested_language_file = os.path.join(language_folder, f"{language}.json")
+    if not os.path.exists(requested_language_file):
+        raise ValueError(f"Language {language} not found ({requested_language_file})")
+    with open(requested_language_file, "r", encoding="utf-8") as f:
+        language_file: Dict[Literal["keys", "language"], Union[Dict[str, str], List[str]]] = json.load(f)
+        keys = language_file.get("keys", None)
         if keys is None:
             return
         current_language = language
-        current_language_keys = keys.get("keys", {})
+        current_language_keys = keys # type: ignore
 
 
 def get_localization(key: str, *inserts, error_on_insufficient_arguments: bool = False) -> str:
@@ -57,7 +59,7 @@ def get_localization(key: str, *inserts, error_on_insufficient_arguments: bool =
     if not expected == amount:
         if error_on_insufficient_arguments:
             raise ValueError("Insufficient arguments")
-        return string + get_localization("insufficient_arguments", error_on_insufficient_arguments=True) + " %s/%s" % (expected, amount)
+        return string + " <-> " +get_localization("insufficient_arguments", error_on_insufficient_arguments=True) + " %s/%s" % (expected, amount)
     return string % tuple(inserts)
 
 
