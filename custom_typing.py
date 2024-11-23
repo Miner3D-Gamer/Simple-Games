@@ -1,5 +1,4 @@
-from typing import Literal, Dict, Union, Iterable, Tuple, List, Optional
-
+from typing import Literal, Dict, Union, Iterable, Tuple, Optional
 
 class Game:
     def __init__(self) -> None:
@@ -12,14 +11,14 @@ class Game:
             Union[
                 str,
                 Optional[Literal["end", "change_inputs"]],
-                Optional[Union[Iterable, Literal["arrows", "range-{min}-{max}"]]],
+                Optional[Union[Iterable[str], Literal["arrows", "range-{min}-{max}"]]],
             ],
         ],
     ]:
         """
         A function called for every frame
 
-        None: An error occurred yet instead of raising an error, None is returned to signalize that the game loop should be stopped
+        None: Something went wrong yet instead of raising an error, None can be returned to signalize that the game loop should be stopped
 
         Actions:
             "end": Displays the last frame and ends the game loop
@@ -29,8 +28,6 @@ class Game:
             "error": Displays the given frame yet also signalized that something went wrong
 
         """
-        print(input)
-        return {"frame": f"Frame {input}"}
 
     def setup(
         self,
@@ -49,25 +46,18 @@ class Game:
     ) -> Tuple[
         str,
         Union[
-            Iterable,
+            Iterable[str],
             Literal["arrows", "range-{min}-{max}"],
-            Dict[Literal["receive_last_frame"], bool],
         ],
+        Optional[Dict[Literal["receive_last_frame"], bool]],
     ]:
         "The custom replacement to __init__"
-        return ("First frame", [*"abcdefgh"])
+        return ("First frame", ["a", "b", "c"], None)
 
     def info(self) -> Dict[Literal["name", "id", "description"], str]:
         "Before the game is run, this function is called when adding the game to the library in order to give the user a preview of what's to expect"
         return {
-            "name": "Minesweeper",
-            "id": "minesweeper",
-            "description": "A simple puzzle game",
+            "name": "Custom game",
+            "id": "example_game",
+            "description": "A simple game",
         }
-    
-    def generate_board(self, width:int, height:int, mine_count:int):
-        string = ""
-        
-        for w in width:
-            for h in height:
-                print(w, h)

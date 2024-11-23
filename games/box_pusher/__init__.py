@@ -1,4 +1,4 @@
-from typing import Literal, Dict, Union, Iterable, Tuple, List, Optional
+from typing import Literal, Dict, Union, Iterable, Tuple, List,Any
 
 import json, os
 from copy import deepcopy as copy
@@ -33,16 +33,16 @@ class Game:
         with open(file_path, "r") as file:
             parser = ijson.parse(file)
             found = False
-            metadata = {}
-            current_key = None
-            current_object = metadata
+            metadata: Dict[str, Any] = {}
+            current_key = ""
+            current_object:Union[Dict[str, Any], List[Any]] = metadata
 
             for prefix, event, value in parser:
                 if found:
                     if event == "map_key":
                         current_key = value
                     elif event in ("start_map", "start_array"):
-                        new_object = {} if event == "start_map" else []
+                        new_object:Union[Dict[str, Any], List[Any]] = {} if event == "start_map" else []
                         if isinstance(current_object, list):
                             current_object.append(new_object)
                         else:
@@ -632,7 +632,7 @@ class Game:
 
     def exit_world(self):
         next = self.change_menu("world_selection")
-        next.update({"action": "change_inputs", "inputs": "range-1-8"})
+        next.update({"action": "change_inputs", "inputs": "range-1-4"})
         return next
 
     def main(self, input: int, user: str) -> None | dict:
@@ -686,7 +686,7 @@ class Game:
         ],
         Dict[Literal["receive_last_frame"], bool],
     ]:
-        return self.get_menu(), "range-1-8"
+        return self.get_menu(), "range-1-4"
 
     def info(self) -> dict:
         return {

@@ -1,0 +1,3 @@
+__all__ = ['convert_time']
+
+def convert_time(time: int | float, from_unit: str, to_unit: str) -> float: ...
