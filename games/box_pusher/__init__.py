@@ -1,4 +1,4 @@
-from typing import Literal, Dict, Union, Iterable, Tuple, List,Any
+from typing import Literal, Dict, Union, Iterable, Tuple, List,Any,Optional
 
 import json, os
 from copy import deepcopy as copy
@@ -154,7 +154,6 @@ class Game:
     def get_world_from_page_and_index(
         self, page: int, index: int, page_size: int = 10
     ) -> str:
-        print(page)
         global_index = page * page_size + index
 
         all_world_names = self.get_all_world_names()
@@ -181,7 +180,7 @@ class Game:
             names.append(name)
         return names
 
-    def get_all_world_files(self) -> list[dict]:
+    def get_all_world_files(self) -> list[str]:
 
         json_files = [f for f in os.listdir(self.worlds_folder) if f.endswith(".json")]
 
@@ -198,9 +197,9 @@ class Game:
             if level in levels:
                 return level
         else:
-            return ""
+            return [""]
 
-    def get_level(self, world: str, level: str) -> tuple[int, int, dict]:
+    def get_level(self, world: str, level: str):
 
         with open(os.path.join(self.worlds_folder, world)) as f:
             data = json.load(f)
@@ -361,10 +360,10 @@ class Game:
             return True
         return False
 
-    def start_round(self, world: str) -> bool:
+    def start_round(self, world: str) -> Optional[bool]:
         self.player_exists = False
 
-        data = self.get_level(world, self.level_id)
+        data = self.get_level(world, str(self.level_id))
         if data == {}:
             return False
         errors = self.load_level(data)
@@ -684,9 +683,9 @@ class Game:
             Iterable,
             Literal["arrows", "range-{min}-{max}"],
         ],
-        Dict[Literal["receive_last_frame"], bool],
+        Optional[Dict[Literal["receive_last_frame"], bool]],
     ]:
-        return self.get_menu(), "range-1-4"
+        return self.get_menu(), "range-1-4", None
 
     def info(self) -> dict:
         return {

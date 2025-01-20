@@ -1,15 +1,17 @@
 {
-    "language": {
-        "en": "English",
-        "de": "Englisch"
-    },
     "keys": {
-        "input.force_close": "Force closed the game",
-        "game_selection.individual_game": ">- %s (%s)",
-        "game_selection.game_list": "Select game from this list:",
-        "exit.keyboard_interrupt": "Force closed the game",
-        "game.exception.unhandled": "An error has occurred; %s \n%s",
-        "game.debug.frame_time": "Game took %s seconds to generate output",
-        "insufficient_arguments": "Not enough arguments"
+        "engine.debug.frame_time": "Game took %s seconds to generate output",
+        "engine.game.error.invalid_return_type": "Invalid return type, expected dict but got %s",
+        "engine.game.error.unhandled": ".main() returned None Indicating an error has occurred. More is not known",
+        "engine.game.exception.unhandled": "An error has occurred; %s \n%s",
+        "engine.game_selection.game_list": "Select game from this list:%s",
+        "engine.game_selection.individual_game": ">- %s (%s)",
+        "engine.input.force_close": "Force closed the game",
+        "engine.translation.insufficient_arguments": "Not enough arguments",
+        "exit.keyboard_interrupt": "Force closed the game"
+    },
+    "language": {
+        "de": "Englisch",
+        "en": "English"
     }
 }

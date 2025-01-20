@@ -1,4 +1,15 @@
-from typing import Literal, Dict, Union, Iterable, Tuple, Optional, Any, List, Callable
+from typing import (
+    Literal,
+    Dict,
+    Union,
+    Tuple,
+    Optional,
+    Any,
+    List,
+    Callable,
+    TypeAlias,
+)
+from collections.abc import Callable as abc_Callable
 
 import tge
 
@@ -16,6 +27,16 @@ import sys
 import time
 import json
 
+# cu: change_user # Change user mid-game
+# fq: force_quit  # Force exit current game
+# fi: force_input # Input invalid/unaccounted character for current game (There is a high chance the game will crash if this is used, only use if necessary)
+
+commands = {
+    "cu": {"description": "Change user mid-game", "function": None, "args": ["str"]},
+    "fq": {"description": "Force quit", "function": None, "args": 0},
+    "fi": {"description": "Force input", "function": None, "args": ["int"]},
+}
+
 debug = True
 record_input = False
 current_folder = os.path.dirname(__file__)
@@ -25,10 +46,36 @@ language_folder = os.path.join(current_folder, "language")
 language = "en"
 timeout = 5  # seconds
 user = tge.tbe.get_username()
+current_language = ""
+
+from lib import wait_for_key
 
 record_file = f"{time.localtime().tm_year}-{time.localtime().tm_mon}-{time.localtime().tm_mday}-inputs-"
 
 record_path = os.path.join(record_directory, record_file)
+
+tbh = "⠀⠀⠀⠀⠀⠀⢀⣠⠤⠔⠒⠒⠒⠒⠒⠢⠤⢤⣀⠀⠀⠀⠀⠀⠀\n⠀⠀⠀⢀⠴⠊⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠲⣄⠀⠀⠀\n⠀⠀⡰⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢧⠀⠀\n⠀⡸⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢇⠀\n⠀⡇⠀⠀⠀⢀⡶⠛⣿⣷⡄⠀⠀⠀⣰⣿⠛⢿⣷⡄⠀⠀⠀⢸⠀\n⠀⡇⠀⠀⠀⢸⣷⣶⣿⣿⡇⠀⠀⠀⢻⣿⣶⣿⣿⣿⠀⠀⠀⢸⠀\n⠀⡇⠀⠀⠀⠈⠛⠻⠿⠟⠁⠀⠀⠀⠈⠛⠻⠿⠛⠁⠀⠀⠀⢸⠀\n⠀⠹⣄⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠏⠀\n⠀⠀⠈⠢⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⣚⡁⠀⠀\n⠀⠀⠀⠀⠈⠙⠒⢢⡤⠤⠤⠤⠤⠤⠖⠒⠒⠋⠉⠉⠀⠀⠉⠉⢦\n⠀⠀⠀⠀⠀⠀⠀⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸\n⠀⠀⠀⠀⠀⠀⠀⢸⡀⠀⠀⠀⠀⣤⠀⠀⠀⢀⣀⣀⣀⠀⠀⠀⢸\n⠀⠀⠀⠀⠀⠀⠀⠈⡇⠀⠀⠀⢠⣿⠀⠀⠀⢸⠀⠀⣿⠀⠀⠀⣸\n⠀⠀⠀⠀⠀⠀⠀⠀⢱⠀⠀⠀⢸⠘⡆⠀⠀⢸⣀⡰⠋⣆⠀⣠⠇\n⠀⠀⠀⠀⠀⠀⠀⠀⠀⠳⠤⠤⠼⠀⠘⠤⠴⠃⠀⠀⠀⠈⠉⠁⠀"
+
+
+def pad_value(val: Any, how_many: int, char: str) -> str:
+    return str(val).rjust(how_many, char)
+
+
+def get_time_stamp() -> str:
+    now = time.localtime()
+    return (
+        f"{now.tm_year}"
+        + "-"
+        + pad_value(now.tm_mon, 2, "0")
+        + "-"
+        + pad_value(now.tm_mday, 2, "0")
+        + "-"
+        + pad_value(now.tm_hour, 2, "0")
+        + ":"
+        + pad_value(now.tm_min, 2, "0")
+        + ":"
+        + pad_value(now.tm_sec, 2, "0")
+    )
 
 
 if record_input:
@@ -36,110 +83,264 @@ if record_input:
 
 
 current_language_keys: Dict[str, str] = {}
+GAMES: Dict[str, Any] = {"games": {}}
 
 
-def load_language(language: str)->None:
+def load_language(language: str) -> None:
     global current_language, current_language_keys
     requested_language_file = os.path.join(language_folder, f"{language}.json")
     if not os.path.exists(requested_language_file):
         raise ValueError(f"Language {language} not found ({requested_language_file})")
     with open(requested_language_file, "r", encoding="utf-8") as f:
-        language_file: Dict[Literal["keys", "language"], Union[Dict[str, str], List[str]]] = json.load(f)
+        language_file: Dict[
+            Literal["keys", "language"], Union[Dict[str, str], List[str]]
+        ] = json.load(f)
         keys = language_file.get("keys", None)
         if keys is None:
             return
         current_language = language
-        current_language_keys = keys # type: ignore
+        current_language_keys = keys  # type: ignore
 
 
-def get_localization(key: str, *inserts, error_on_insufficient_arguments: bool = False) -> str:
-    string:str = current_language_keys.get(key, key)
-    amount = string.count("%s")
-    expected = len(inserts)
-    if not expected == amount:
-        if error_on_insufficient_arguments:
+def get_localization(key: str, *inserts) -> str:
+    empty_string_key = "engine.translation.empty_translation"
+    insufficient_arguments_key = "engine.translation.insufficient_arguments"
+
+    string: str = current_language_keys.get(key, key)
+
+    # If the string corresponding to the inputted key is empty, try to get a fallback key. If that fails, it just errors
+    if string == "":
+        if key == empty_string_key:
+            ValueError("Empty string for key")
+        string = get_localization(empty_string_key)
+
+    translation_key_insert_amount = string.count("%s")
+    given_key_insert_amount = len(inserts)
+
+    # If the given key insert amount is not equal to the translation key insert amount, try to get a fallback key and if the fallback key is also faulty, error
+    if given_key_insert_amount != translation_key_insert_amount:
+
+        if key == insufficient_arguments_key:
             raise ValueError("Insufficient arguments")
-        return string + " <-> " +get_localization("insufficient_arguments", error_on_insufficient_arguments=True) + " %s/%s" % (expected, amount)
+        return "'%s' <-> %s %s!=%s" % (
+            string,
+            get_localization(insufficient_arguments_key),
+            given_key_insert_amount,
+            translation_key_insert_amount,
+        )
     return string % tuple(inserts)
 
 
-def request_input() -> str:
+class ALL_FINE: ...
+
+
+class INFO: ...
+
+
+class DEBUG: ...
+
+
+class WARNING: ...
+
+
+class ERROR: ...
+
+
+class FATAL_ERROR: ...
+
+
+LOGGING_ANNOTATION: TypeAlias = (
+    type[ALL_FINE]
+    | type[INFO]
+    | type[WARNING]
+    | type[DEBUG]
+    | type[ERROR]
+    | type[FATAL_ERROR]
+)
+
+
+def request_input(single_letter=True) -> str:
+    total = ""
     try:
-        inp = input()
+        while True:
+            inp = wait_for_key()
+            if not single_letter:
+                print(inp, end="", flush=True)
+            else:
+                total += inp
+                break
+
+            if inp in "\r\n":
+                break
+            else:
+                total += inp
     except ValueError:
-        inp = ""
+        total = ""
     except KeyboardInterrupt:
-        send(get_localization("input.force_close"))
+        send(get_localization("engine.input.force_close"))
         quit()
+    return total
 
-    return inp
 
-
-def log(*msg:Any):
+def console_log(*msg: Any):
     print(*msg)
 
 
-def send(msg: str):
-    tge.console.clear()
-    print(msg)
+def send(msg: str) -> dict[LOGGING_ANNOTATION, str]:
+    # ANSI escape sequence to move cursor to top-left corner
+    CURSOR_UP = "\033[H"
+    # ANSI escape sequence to clear from cursor to end of screen
+    CLEAR_FROM_CURSOR = "\033[J"
+
+    print(f"{CURSOR_UP}{CLEAR_FROM_CURSOR}{msg}", end="", flush=True)
+
+    return {}
 
 
-def error_message(msg: str):
-    log(msg)
-    # send(msg)
+def log(msg: str, logging: LOGGING_ANNOTATION = ALL_FINE) -> bool:
+    if logging is ALL_FINE:
+        console_log(msg)
+        return False
+    if logging is INFO:
+        console_log("[%s] INFO> %s" % (get_time_stamp(), msg))
+        return False
+    if logging is WARNING:
+        console_log("[%s] WARNING> %s" % (get_time_stamp(), msg))
+        return False
+    if logging is DEBUG:
+        console_log("[%s] DEBUG> %s" % (get_time_stamp(), msg))
+        return False
+    if logging is ERROR:
+        console_log("[%s] ERROR> %s" % (get_time_stamp(), msg))
+        return False
+    if logging is FATAL_ERROR:
+        console_log("[%s] FATAL_ERROR> %s" % (get_time_stamp(), msg))
+        return True
+
+    log("Unknown logging type: %s for '%s'" % (logging, msg), ERROR)
+    return False
 
 
-GAMES: Dict[str, Any] = {"games": {}}
-
-
-def add_input_to_list(input: str, current_game: str):
+def add_input_to_list(key_input: str, current_game: str):
     with open(
         os.path.join(record_path + current_game + ".txt"), "a", encoding="utf-8"
     ) as f:
-        f.write(f"{input}\n")
+        f.write(f"{key_input}\n")
 
 
 def load_inputs(inputs: Union[str, List[str], Tuple[str]]) -> Tuple[List[str], str]:
     if isinstance(inputs, tuple):
         new_inputs: List[str] = []
-        for input in inputs:
-            internal_inputs, err = load_inputs(input)
+        for key_input in inputs:
+            internal_inputs, err = load_inputs(key_input)
             if err:
                 return [], err
             new_inputs.extend(internal_inputs)
 
         return new_inputs, ""
-    if isinstance(inputs, str):
-        if inputs.startswith("range-"):
-            inputs = inputs[6:].split("-", 1)
-            if not (inputs[0].isdigit() or inputs[1].isdigit()):
-                return [], "Expected number in number range but got: %s-%s" % inputs
-            inputs = [str(x) for x in [*range(int(inputs[0]), int(inputs[1]) + 1)]]
+    elif isinstance(inputs, str):
+        if inputs.__contains__("-"):
+            if inputs[0].isdigit() or inputs.startswith("range-"):
+                if inputs.startswith("range-"):
+                    inputs = inputs[6:]
+                inputs = inputs.split("-", 1)
+                if len(inputs) != 2:
+                    return (
+                        [],
+                        "Expected number in number range (num1-num2) but got: %s"
+                        % inputs,
+                    )
+
+                if not (inputs[0].isdigit() or inputs[1].isdigit()):
+                    return [], "Expected number in number range but got: %s-%s" % inputs
+
+                def try_convert(x):
+                    try:
+                        return int(x)
+                    except ValueError:
+                        return (x,)
+
+                start = try_convert(inputs[0])
+                if not isinstance(start, int):
+                    return (
+                        [],
+                        "First value in input number range is not a number: %s" % start,
+                    )
+
+                end = try_convert(inputs[1])
+                if not isinstance(end, int):
+                    return (
+                        [],
+                        "Second value in input number range is not a number: %s" % end,
+                    )
+
+                if 0 > start or start > 9:
+                    return (
+                        [],
+                        "First value in input number range is not between 0 and 9: %s"
+                        % start,
+                    )
+
+                if 0 > end or end > 9:
+                    return (
+                        [],
+                        "Second value in input number range is not between 0 and 9: %s"
+                        % end,
+                    )
+
+                inputs = [
+                    str(x) for x in [*range(start, end + 1, 1 if start < end else -1)]
+                ]
+            else:
+                return [], "Expected number in number range but got: %s" % inputs
         else:
-            got_it = False
+            got_it = True
             match inputs:
                 case "arrows":
                     inputs = [*"⬅⬆⬇➡"]
-                    got_it = True
+
                 case _:
-                    raise BaseException("Hi, please report me. Dev forgot to test me")
+                    got_it = False
+                    # raise BaseException("Hi, please report me. Dev forgot to test me \n%s"%tbh)
+
             if not got_it:
                 raise ValueError("Invalid input preset")
+    elif isinstance(inputs, dict):
+        presets: str | list[str] = inputs.get("presets", [])
+        custom: list[str] = inputs.get("custom", [])
+        if not tge.tbe.is_iterable(presets):
+            return [], "Preset is not iterable"
+        
+        if not tge.tbe.is_iterable(custom):
+            return [], "Custom is not iterable"
+        
+        preset_inputs = load_inputs(presets)
+        if preset_inputs[1]:
+            return [], preset_inputs[1]
+
+        custom_inputs = load_inputs(custom)
+        if custom_inputs[1]:
+            return [], custom_inputs[1]
+
+        return preset_inputs[0] + custom_inputs[0], ""
+
     elif not tge.tbe.is_iterable(inputs):
         return [], "Inputs are not iterable"
 
     if isinstance(inputs, str):
         return [], "Invalid input preset"
-    
+
     return inputs, ""
 
 
-def load_game(game:Game) -> Union[str, None]:
+def load_game(game: Game) -> Union[str, None]:
     # Init given game instance
-    thing = game() # type: ignore
-    
+    thing = game()  # type: ignore
+
     try:
-        game_result = tge.function_utils.run_function_with_timeout(thing.setup, timeout, {"user": user, "interface": "console"})
+        game_result = tge.function_utils.run_function_with_timeout(
+            thing.setup, timeout, {"user": user, "interface": "console"}
+        )
     except BaseException as e:
         return "Error occurred while trying to load game: %s %s" % (
             e,
@@ -154,14 +355,16 @@ def load_game(game:Game) -> Union[str, None]:
     if not hasattr(thing, "setup"):
         return "Error: Missing game setup -> setup()"
     try:
-        info: Union[Any, Dict[Literal["name", "id", "inputs"], str]] = tge.function_utils.run_function_with_timeout(thing.info, timeout)
+        info: Union[Any, Dict[Literal["name", "id", "inputs"], str]] = (
+            tge.function_utils.run_function_with_timeout(thing.info, timeout)
+        )
     except BaseException as e:
         return "Error occurred while trying to receive info from game: %s" % e
     if info is tge.function_utils.TimeoutResult:
         return "Error: Info timeout"
     if not isinstance(info, dict):
         return "Invalid info typing: %s" % type(info)
-    
+
     name = info.get("name", "")
     id = info.get("id", "")
     inputs = info.get("inputs", "")
@@ -191,7 +394,9 @@ def load_game(game:Game) -> Union[str, None]:
     GAMES["games"][id]["game"] = thing
     GAMES["games"][id]["inputs"] = inputs
     GAMES["games"][id]["name"] = name
+    return None
 
+all_error = []
 
 for game_folder in games_folders:
     sys.path.append(game_folder)
@@ -202,23 +407,26 @@ for game_folder in games_folders:
                 try:
                     game = importlib.import_module(dir)
                     if not hasattr(game, "Game"):
-                        log("Module %s missing game" % dir)
+                        all_error.append("Module %s missing game" % dir)
                         continue
                 except TypeError:
                     continue
                 except BaseException as e:
-                    log("Error while importing %s: %s" % (dir, e))
+                    all_error.append("Error while importing %s: %s" % (dir, e))
                     continue
-                if not isinstance(game.Game, Callable):
-                    log("Module %s missing game" % dir)
-                error = load_game(game.Game) # type: ignore
+                if not callable(game.Game):
+                    all_error.append("Module %s missing game" % dir)
+                error = load_game(game.Game)  # type: ignore
 
                 if error:
                     traceback.print_exc()
-                    log("Error importing %s:\n%s" % (dir, error))
+                    all_error.append("Error importing %s:\n%s" % (dir, error))
             else:
                 break
-
+if all_error:
+    for e in all_error:
+        log(e, ERROR)
+    request_input()
 
 def redirect_key(key: str):
     key_translator = {
@@ -226,24 +434,36 @@ def redirect_key(key: str):
         "a": "⬅",
         "s": "⬇",
         "d": "➡",
+        "UP": "⬆",
+        "LEFT": "⬅",
+        "DOWN": "⬇",
+        "RIGHT": "➡",
     }
     return key_translator.get(key, key)
 
 
 def run_game(
-    game: Game, game_id: str, frame: str, accepted_inputs: List[str], give_old_frame: bool
+    game: Game,
+    game_id: str,
+    frame: str,
+    accepted_inputs: List[str],
+    give_old_frame: bool,
 ):
     send_new_frame = True
-    # last_frame = ""
-    end, start = 0, 0
+    debug_mode_enabled = True
+    end, start = 0.0, 0.0
     while True:
         old_frame = ""
         if send_new_frame:
-            send(frame + "\nValid inputs: %s" % accepted_inputs)
             send_new_frame = False
-            log(get_localization("game.debug.frame_time") % (end - start) + "\n")
+            if debug_mode_enabled:
+                send(frame + "\nValid inputs: %s\n" % accepted_inputs)
+                log(
+                    get_localization("engine.debug.frame_time", (end - start)) + "\n",
+                    DEBUG,
+                )
 
-        user_input = request_input()
+        user_input = request_input(True)
         if user_input.startswith("& "):
             quit()
         original_user_input = user_input
@@ -262,20 +482,27 @@ def run_game(
             add_input_to_list(original_user_input, game_id)
         start = time.time()
 
-        inputs: List[Union[str, int]] = [input_id, user] + ([old_frame] if give_old_frame else [])
-        
+        inputs: List[Union[str, int]] = [input_id, user] + (
+            [old_frame] if give_old_frame else []
+        )
+
         try:
-            output = tge.function_utils.run_function_with_timeout(game.main, timeout, *inputs)
+            output = tge.function_utils.run_function_with_timeout(
+                game.main, timeout, *inputs
+            )
             # output = game.main(input_id, user)
         except SystemExit:
             break
         except KeyboardInterrupt:
-            error_message(get_localization("exit.keyboard_interrupt"))
+            log(get_localization("exit.keyboard_interrupt"))
             request_input()
             break
         except BaseException as e:
-            error_message(
-                "\n"+ get_localization("game.exception.unhandled")% (e, traceback.format_exc())
+            log(
+                "\n"
+                + get_localization(
+                    "engine.game.exception.unhandled", e, traceback.format_exc()
+                )
             )
 
             request_input()
@@ -284,18 +511,23 @@ def run_game(
             end = time.time()
 
         if output is tge.function_utils.TimeoutResult:
-            error_message("\nMain function timed out")
+            log("\nMain function timed out")
             request_input()
             break
 
         if output is None:
-            error_message("\nAn error has occurred. More is not known")
+            log("\n" + get_localization("engine.game.error.unhandled"))
             request_input()
             break
 
         if output:
             if not isinstance(output, dict):
-                error_message("\nInvalid return type: %s" % type(output))
+                log(
+                    "\n"
+                    + get_localization(
+                        "engine.game.error.invalid_return_type", type(output)
+                    )
+                )
                 request_input()
                 break
             action = output.get("action", "")
@@ -317,7 +549,7 @@ def run_game(
                         accepted_inputs, errors = load_inputs(requested_inputs)
 
                         if errors:
-                            error_message(
+                            log(
                                 "\nReceived invalid input request when application tried changing inputs: %s"
                                 % errors
                             )
@@ -325,65 +557,85 @@ def run_game(
                             break
 
 
-def select_game(game_id: str) -> Union[Tuple[str, List[str], Game, bool], Literal[""]]:
+def select_game(game_id: str) -> Union[Tuple[str, List[str], Game, bool], str]:
     global GAMES
     game: Game = deepcopy(GAMES["games"][game_id]["game"])
-    
+
     try:
         result = tge.function_utils.run_function_with_timeout(
             game.setup, timeout, info={"user": user, "interface": "console"}
         )
     except BaseException as e:
-        error_message(
-            "Error while receiving initial frame from game: %s %s"
-            % (e, traceback.format_exc())
+        return "Error while receiving initial frame from game: %s %s" % (
+            e,
+            traceback.format_exc(),
         )
-        request_input()
-        return ""
     if isinstance(result, tge.function_utils.TimeoutResult):
-        error_message("Timeout while setup")
-        request_input()
-        return ""
-    things = len(result)
-    if things == 3:
+        return "Timeout while setup, took over %s seconds" % timeout
+    game_return_amount = len(result)
+    if game_return_amount == 3:
         frame, requested_inputs, settings = result
-    elif things == 2:
+    elif game_return_amount == 2:
         frame, requested_inputs = result
         settings = {}
     else:
-        return ""
+        return (
+            "Invalid amount of return values returned, expected 2 or 3 but got %s"
+            % game_return_amount
+        )
+    if settings is None:
+        settings = {}
+    if not isinstance(frame, str):
+        return "Invalid frame type, expected string but got %s" % type(frame)
+    if not isinstance(settings, dict):
+        return "Invalid settings type, expected dict but got %s" % type(settings)
 
     accepted_inputs, errors = load_inputs(requested_inputs)
     if errors:
-        error_message(
-            "Received invalid input request while trying to load game: %s" % errors
-        )
-        request_input()
-        return ""
+        return "Received invalid input request while trying to load game: %s" % errors
     return frame, accepted_inputs, game, bool(settings.get("receive_last_frame", False))
 
 
 def select_game_from_user(user: str):
     while True:
-        log("Selected Username:", user)
+        send_string = "Selected Username: %s\n" % user
         game_amount = len(GAMES["games"])
+
+        # No need for the user to manually select a game if there is just a single game
         if game_amount == 1:
             game_id = [*GAMES["games"]][0]
             break
+
         if game_amount == 0:
             send("No games available")
             quit()
-        print_string = get_localization("game_selection.game_list")
+
+        # Store games and insert them into a game list
+        game_list_string = ""
         for game in GAMES["games"]:
-            
-            print_string += "\n"+get_localization("game_selection.individual_game", GAMES["games"][game]["name"], game)
-        print_string += "\n"
-        send(print_string)
-        game = request_input()
+
+            game_list_string += "\n" + get_localization(
+                "engine.game_selection.individual_game",
+                GAMES["games"][game]["name"],
+                game,
+            )
+        send_string += get_localization(
+            "engine.game_selection.game_list", game_list_string
+        )
+
+        # Padding not needed in non console?
+        send_string += "\n"
+        send(send_string)
+
+        game = request_input(False)
         if not game:
             continue
+
+        # For quicker development
         if game[0] == "&":
             quit()
+
+        # Autocomplete
         game_id = tge.tbe.strict_autocomplete(game, GAMES["games"])
         if not isinstance(game_id, str):
             tge.console.clear()
@@ -392,17 +644,22 @@ def select_game_from_user(user: str):
     return game_id
 
 
+def start_engine():
+    while True:
+        game_id = select_game_from_user(user)
+
+        tge.console.clear()
+        stuff = select_game(game_id)
+        if isinstance(stuff, str):
+            send(
+                "Error while running .setup() of the currently selected game:\n" + stuff
+            )
+            request_input()
+            continue
+        first_frame, inputs, game, give_old_frame = stuff
+        run_game(game, game_id, first_frame, inputs, give_old_frame)
+
+
 load_language(language)
 
-
-
-
-while True:
-    game_id = select_game_from_user(user)
-    
-    tge.console.clear()
-    stuff = select_game(game_id)
-    if stuff == "":
-        continue
-    first_frame, inputs, game, give_old_frame = stuff
-    run_game(game, game_id, first_frame, inputs, give_old_frame)
+start_engine()

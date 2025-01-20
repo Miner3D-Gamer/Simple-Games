@@ -8,4 +8,6 @@ games/dots_and_boxes/__pycache__/__init__.cpython-311.pyc
 games/minesweeper/__pycache__/__init__.cpython-311.pyc
 games/sudoku/__pycache__/__init__.cpython-311.pyc
 games/tictactoe/__pycache__/__init__.cpython-311.pyc
+games/world/__pycache__/__init__.cpython-311.pyc
 __pycache__/custom_typing.cpython-311.pyc
+__pycache__/lib.cpython-311.pyc

@@ -1,0 +1,54 @@
+# class CustomPrint:
+#     def __init__(self) -> None:
+#         self.new_lines = 0
+#         self.longest = 0
+
+#     def print(self, *things, **parms):
+#         yep = {"end": "\n"}
+#         yep.update(parms)
+        
+#         reset_new_lines = yep.pop("reset_new_lines", False)
+#         if reset_new_lines:
+#             old_lines = self.new_lines
+#         else:
+#             old_lines = 0
+
+#         self.new_lines += count_newlines(things + tuple(yep.values()))
+        
+#         things = [str(x).rjust(self.longest, " ") for x in things]
+        
+#         l = len(things)
+        
+#         if l > self.longest:
+#             self.longest = l
+
+#         print(*things, **yep)
+#         new_lines_left_to_clean_up = self.new_lines - old_lines
+#         if new_lines_left_to_clean_up > 0:
+#             for i in range(new_lines_left_to_clean_up):
+#                 print(" " * self.longest)
+#             self.move_console_cursor_up(new_lines_left_to_clean_up)
+
+#     def get_new_lines(
+#         self,
+#     ):
+#         return self.new_lines
+    
+    
+#     def move_console_cursor_up(self, amount):
+#         print("\033[F" * amount, end="", flush=True)
+#         self.new_lines -= amount
+def count_newlines(thing) -> int:
+    if isinstance(thing, str):
+        return thing.count("\n")
+    
+    if isinstance(thing, bool):
+        return 0
+    
+    if isinstance(thing, bytes):
+        return thing.count(b"\n")
+
+    if hasattr(thing, '__iter__'):
+        return sum([count_newlines(x) for x in thing])
+
+    raise ValueError(f"Type unimplemented: {type(thing)}")
