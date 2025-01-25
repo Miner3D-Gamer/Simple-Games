@@ -1,16 +1,5 @@
 from typing import Literal, Dict, Union, Iterable, Tuple, Optional, TypeAlias, TypedDict
-
-# class Requirements:
-#     modules:list[str]
-#     python_version: str
-
-class ExtraInfo(TypedDict):
-    username: str
-    user_id: str
-    old_frame: str
-    frame: str
-    deltatime: float
-    time_between_frame_start: float
+from custom_typing import ExtraInfo
 
 
 class Game:
@@ -77,31 +66,3 @@ class Game:
             "id": "example_game",
             "description": "A simple game",
         }
-
-
-class ALL_FINE: ...
-
-
-class INFO: ...
-
-
-class DEBUG: ...
-
-
-class WARNING: ...
-
-
-class ERROR: ...
-
-
-class FATAL_ERROR: ...
-
-
-LOGGING_ANNOTATION: TypeAlias = (
-    type[ALL_FINE]
-    | type[INFO]
-    | type[WARNING]
-    | type[DEBUG]
-    | type[ERROR]
-    | type[FATAL_ERROR]
-)
