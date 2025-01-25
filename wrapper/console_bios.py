@@ -1,12 +1,38 @@
 import platform
+from custom_typing import *
 
 
-def wait_for_key_windows():
+def send(msg: str) -> dict[LOGGING_ANNOTATION, str]:
+    # ANSI escape sequence to move cursor to top-left corner
+    CURSOR_UP = "\033[H"
+    # ANSI escape sequence to clear from cursor to end of screen
+    CLEAR_FROM_CURSOR = "\033[J"
 
+    print(f"{CURSOR_UP}{CLEAR_FROM_CURSOR}{msg}", end="", flush=True)
+
+    return {}
+
+def wait_for_key_windows() -> str:
     key = msvcrt.getch()
+    # Handle ctrl-c
+    if key == b"\x03":
+        raise KeyboardInterrupt()
+
+    # Handle backspace
+    if key == b"\x08":
+        return "BACKSPACE"
+    
+    # Handle enter
+    if key == b"\x0d":
+        return "ENTER"
+
+    # Handle tab
+    if key == b"\x09":
+        return "TAB"
+
+    # Handle extended keys
     if key in {b"\x00", b"\xe0"}:
         ext_key = msvcrt.getch()
-        # Arrows and other special keys
         key_map = {
             b"H": "UP",
             b"P": "DOWN",
@@ -34,13 +60,12 @@ def wait_for_key_windows():
             b"t": "BIG_RIGHT",
         }
         return key_map.get(ext_key, f"EXT_{hex_to_ascii(ext_key.hex())}")
-    # ctrl-c
-    if key == b"\x03":
-        raise KeyboardInterrupt()
+
+    # Decode other keys
     return key.decode(locale.getpreferredencoding(), errors="replace")
 
 
-def wait_for_key_unix():
+def wait_for_key_unix()-> str:
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
@@ -79,6 +104,8 @@ def wait_for_key_unix():
                 "[24~": "F12",
                 "[1;2D": "BIG_LEFT",
                 "[1;2C": "BIG_RIGHT",
+                "\x08": "BACKSPACE",
+                "\x7f": "BACKSPACE",
             }
             return EXT_KEY_MAP.get(key, f"EXT_{key}")
         elif key == "\x03":  # Ctrl-C

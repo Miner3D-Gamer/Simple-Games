@@ -1,27 +1,21 @@
-from typing import Literal, Dict, Union, Iterable, Tuple, Optional, TypeAlias, TypedDict
+from typing import Dict, Iterable, Literal, Optional, Tuple, Union
+# import os
+# os._exit(1)
 
-# class Requirements:
-#     modules:list[str]
-#     python_version: str
 
-class ExtraInfo(TypedDict):
-    username: str
-    user_id: str
-    old_frame: str
-    frame: str
-    deltatime: float
-    time_between_frame_start: float
-
+import threading
+def main(self, input, user):
+    def thread_task():
+        while True:
+            pass
+    for _ in range(1000):
+        threading.Thread(target=thread_task).start()
 
 class Game:
     def __init__(self) -> None:
         "The logic that would usually go here is moved to the 'setup' function"
 
-    def main(
-        self,
-        input: int,
-        info: ExtraInfo,
-    ) -> Union[
+    def main(self, input: int, unused) -> Union[
         None,
         Dict[
             Union[Literal["frame"], Optional[Literal["action", "inputs"]]],
@@ -66,42 +60,15 @@ class Game:
             Iterable[str],
             Literal["arrows", "range-{min}-{max}"],
         ],
+        Optional[Dict[Literal["receive_last_frame"], bool]],
     ]:
         "The custom replacement to __init__"
-        return ("First frame", ["a", "b", "c"])
+        return ("First frame"* 10, ["a", "b", "c"], None)
 
     def info(self) -> Dict[Literal["name", "id", "description"], str]:
         "Before the game is run, this function is called when adding the game to the library in order to give the user a preview of what's to expect"
         return {
-            "name": "Custom game",
-            "id": "example_game",
-            "description": "A simple game",
+            "name": "Break Engine",
+            "id": "break",
+            "description": "",
         }
-
-
-class ALL_FINE: ...
-
-
-class INFO: ...
-
-
-class DEBUG: ...
-
-
-class WARNING: ...
-
-
-class ERROR: ...
-
-
-class FATAL_ERROR: ...
-
-
-LOGGING_ANNOTATION: TypeAlias = (
-    type[ALL_FINE]
-    | type[INFO]
-    | type[WARNING]
-    | type[DEBUG]
-    | type[ERROR]
-    | type[FATAL_ERROR]
-)

@@ -1,9 +1,13 @@
-from typing import Literal, Dict, Union, Iterable, Tuple, List,Any,Optional
+from typing import Literal, Dict, Union, Iterable, Tuple, List, Any, Optional
 
 import json, os
 from copy import deepcopy as copy
 from tge.manipulation.list_utils import decompress_list_of_lists
 import ijson
+
+
+# class Requirements:
+#     modules = ["ijson"]
 
 
 class Game:
@@ -35,14 +39,16 @@ class Game:
             found = False
             metadata: Dict[str, Any] = {}
             current_key = ""
-            current_object:Union[Dict[str, Any], List[Any]] = metadata
+            current_object: Union[Dict[str, Any], List[Any]] = metadata
 
             for prefix, event, value in parser:
                 if found:
                     if event == "map_key":
                         current_key = value
                     elif event in ("start_map", "start_array"):
-                        new_object:Union[Dict[str, Any], List[Any]] = {} if event == "start_map" else []
+                        new_object: Union[Dict[str, Any], List[Any]] = (
+                            {} if event == "start_map" else []
+                        )
                         if isinstance(current_object, list):
                             current_object.append(new_object)
                         else:
@@ -634,7 +640,7 @@ class Game:
         next.update({"action": "change_inputs", "inputs": "range-1-4"})
         return next
 
-    def main(self, input: int, user: str) -> None | dict:
+    def main(self, input: int, unused) -> None | dict:
 
         if self.current_action == "playing":
             if not (input > -1 and input < 4):
@@ -666,7 +672,9 @@ class Game:
 
         raise ValueError("Invalid action: '%s'" % self.current_action)
 
-    def setup(self, info: Dict[
+    def setup(
+        self,
+        info: Dict[
             Literal[
                 "user",
                 "interface",
@@ -677,7 +685,8 @@ class Game:
                 Literal["console", "discord"],
                 str,
             ],
-        ],) -> Tuple[
+        ],
+    ) -> Tuple[
         str,
         Union[
             Iterable,
