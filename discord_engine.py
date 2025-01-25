@@ -1,4 +1,3 @@
-
 from typing import Optional, Union, Literal, Dict, TypedDict, List
 import engine
 import discord_emoji
@@ -29,12 +28,16 @@ message_store: Dict[int, EngineDict] = EasyDict()
 
 from string import ascii_lowercase
 
-async def get_message(channel_id: int, message_id: int, bot: discord.bot.Bot) -> Optional[discord.Message]:
+
+async def get_message(
+    channel_id: int, message_id: int, bot: discord.bot.Bot
+) -> Optional[discord.Message]:
     channel = bot.get_channel(channel_id)
     if channel is None:
         print(f"Channel {channel_id} not found.")
         return None
     return await channel.fetch_message(message_id)  # type: ignore
+
 
 def letter_to_regional_indicator(letter: str) -> str:
     """
@@ -99,10 +102,22 @@ def convert_reaction_to_process(reaction: str) -> str:
     return r
 
 
-async def remove_reactions(message: discord.Message):
+async def remove_reactions(message: discord.Message, allowed_reactions: List[str] = []):
     previoud_reactions = message.reactions
-    for reaction in previoud_reactions:
+    final = []
+    blacklist = []
+    
+    for reaction_idx in range(len(previoud_reactions)):
+        if previoud_reactions[reaction_idx].emoji == allowed_reactions[reaction_idx]:
+            blacklist.append(previoud_reactions[reaction_idx])
+        else:
+            break
+    final = previoud_reactions[len(blacklist):]
+
+    for reaction in final:
         await message.remove_reaction(reaction.emoji, bot.user)  # type: ignore
+        return blacklist
+    return []
 
 
 async def change_reactions(
@@ -111,30 +126,37 @@ async def change_reactions(
         Union[discord.GuildEmoji, discord.AppEmoji, discord.PartialEmoji, str]
     ],
 ):
-    await remove_reactions(message)
-
+    final_reactions = []
     for r in reactions:
-
         if isinstance(r, str):
             if r == " ":
                 r = "blue_square"
             else:
                 r = convert_reaction_to_send(r)
             r = get_emoji(r)
+        final_reactions.append(r)
+
+    blacklist = await remove_reactions(message, final_reactions)
+    final_reactions = final_reactions[len(blacklist):]
+
+    for r in final_reactions:
+
         try:
             await message.add_reaction(r)
         except discord.errors.HTTPException:
             print(f"Failed to add reaction '{r}' to message {message.id}")
 
-__all__ = [
-    "handle_raw_reaction", "handle_message", "stop_bot"
-]
+
+__all__ = ["handle_raw_reaction", "handle_message", "stop_bot"]
 
 
 async def stop_bot(bot: discord.bot.Bot):
     await bot.close()
 
-async def handle_message(message: discord.Message, bot: discord.bot.Bot) -> Optional[Union[bool, Exception]]:
+
+async def handle_message(
+    message: discord.Message, bot: discord.bot.Bot
+) -> Optional[Union[bool, Exception]]:
     if message.author == bot.user:
         return False
 
@@ -183,8 +205,11 @@ async def handle_message(message: discord.Message, bot: discord.bot.Bot) -> Opti
         return True
     return None
 
-async def handle_raw_reaction(payload: discord.RawReactionActionEvent, bot: discord.bot.Bot)-> Optional[Union[bool, Exception]]:
-    
+
+async def handle_raw_reaction(
+    payload: discord.RawReactionActionEvent, bot: discord.bot.Bot
+) -> Optional[Union[bool, Exception]]:
+
     # Definitely not for our purposes
     if payload.user_id == bot.user.id:  # type: ignore
         return False
