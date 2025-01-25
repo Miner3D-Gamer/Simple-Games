@@ -12,6 +12,9 @@ class ExtraInfo(TypedDict):
     deltatime: float
     time_between_frame_start: float
 
+class Inputs(TypedDict):
+    presets: Union[str, list[str]]
+    custom: list[str]
 
 class Game:
     def __init__(self) -> None:
@@ -65,6 +68,7 @@ class Game:
         Union[
             Iterable[str],
             Literal["arrows", "range-{min}-{max}"],
+            Inputs
         ],
     ]:
         "The custom replacement to __init__"

@@ -1,5 +1,5 @@
 from typing import Literal, Dict, Union, Iterable, Tuple, Optional, TypeAlias, TypedDict
-from custom_typing import ExtraInfo
+from custom_typing import ExtraInfo, Inputs
 
 
 class Game:
@@ -54,6 +54,7 @@ class Game:
         Union[
             Iterable[str],
             Literal["arrows", "range-{min}-{max}"],
+            Inputs
         ],
     ]:
         "The custom replacement to __init__"
