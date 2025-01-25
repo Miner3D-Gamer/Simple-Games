@@ -67,7 +67,7 @@ class Game:
         str,
         Union[
             Iterable[str],
-            Literal["arrows", "range-{min}-{max}"],
+            Union[Literal["arrows", "range-{min}-{max}"], str],
             Inputs
         ],
     ]:
