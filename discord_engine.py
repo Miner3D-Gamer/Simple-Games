@@ -78,13 +78,33 @@ def text_to_int(reaction: str) -> Union[int, str]:
         return l.index(reaction)
     return reaction
 
+def convert_special(reaction):
+    ################################ THIS IS NOT GUD BUT THE BEST I CAN DO FOR KEYBOARD ONLY KEYS
+    conversion = {
+        "BACKSPACE": "arrow_backward",
+        " ": "blue_square",
+    }
+    
+    if reaction in conversion:
+        return conversion[reaction]
+    
+    for key, value in conversion.items():
+        if value == reaction:
+            return key
+    return reaction
+    
+
 
 def convert_reaction_to_send(reaction: str) -> str:
     if reaction in ascii_lowercase:
         return letter_to_regional_indicator(reaction)
     elif reaction.isdigit():
         return int_to_text(int(reaction))
-    return reaction
+    
+    
+    
+    
+    return convert_special(reaction)
 
 
 def convert_reaction_to_process(reaction: str) -> str:
@@ -99,44 +119,46 @@ def convert_reaction_to_process(reaction: str) -> str:
         if isinstance(n, int):
             if n != -1:
                 return str(n)
+        s = convert_special(e)
+        if s != e:
+            return s
     return r
 
 
-async def remove_reactions(message: discord.Message, allowed_reactions: List[str] = []):
-    previoud_reactions = message.reactions
+async def remove_reactions(message: discord.Message, allowed_reactions: List[str], bot: discord.bot.Bot):
+    previoud_reactions = message.reactions[::-1]
+    allowed_reactions = allowed_reactions[::-1]
     final = []
     blacklist = []
     
+    
+    # THIS CODE DOES WORK :D or does it?
     for reaction_idx in range(len(previoud_reactions)):
         if previoud_reactions[reaction_idx].emoji == allowed_reactions[reaction_idx]:
             blacklist.append(previoud_reactions[reaction_idx])
         else:
             break
-    final = previoud_reactions[len(blacklist):]
+    final = previoud_reactions[::-1][:len(blacklist)]
 
     for reaction in final:
         await message.remove_reaction(reaction.emoji, bot.user)  # type: ignore
-        return blacklist
-    return []
+    return blacklist
 
 
 async def change_reactions(
     message: discord.Message,
     reactions: List[
         Union[discord.GuildEmoji, discord.AppEmoji, discord.PartialEmoji, str]
-    ],
+    ],bot: discord.bot.Bot
 ):
     final_reactions = []
     for r in reactions:
         if isinstance(r, str):
-            if r == " ":
-                r = "blue_square"
-            else:
-                r = convert_reaction_to_send(r)
+            r = convert_reaction_to_send(r)
             r = get_emoji(r)
         final_reactions.append(r)
 
-    blacklist = await remove_reactions(message, final_reactions)
+    blacklist = await remove_reactions(message, final_reactions, bot)
     final_reactions = final_reactions[len(blacklist):]
 
     for r in final_reactions:
@@ -181,7 +203,7 @@ async def handle_message(
                 message_store[send.id]["engine"] = engine_instance
                 message_store[send.id]["ready"] = False
 
-                await change_reactions(send, engine_instance.accepted_inputs)  # type: ignore
+                await change_reactions(send, engine_instance.accepted_inputs, bot)  # type: ignore
                 message_store[send.id]["ready"] = True
 
                 return True
@@ -195,7 +217,7 @@ async def handle_message(
             message_store[send.id]["engine"] = engine_instance
             message_store[send.id]["ready"] = False
 
-            await change_reactions(send, engine_instance.accepted_inputs)  # type: ignore
+            await change_reactions(send, engine_instance.accepted_inputs, bot)  # type: ignore
             message_store[send.id]["ready"] = True
         else:
             if isinstance(selected, Exception):
@@ -205,6 +227,10 @@ async def handle_message(
         return True
     return None
 
+def get_username(member: discord.Member) -> str:
+    if member.nick is not None:
+        return member.nick
+    return member.name
 
 async def handle_raw_reaction(
     payload: discord.RawReactionActionEvent, bot: discord.bot.Bot
@@ -231,11 +257,11 @@ async def handle_raw_reaction(
         engine_instance = message_store[payload.message_id]["engine"]
         reaction_str = convert_reaction_to_process(payload.emoji.name)  # type: ignore
 
-        output = engine_instance.run_game(reaction_str, payload.user_id, payload.member.name)  # type: ignore
+        output = engine_instance.run_game(reaction_str, payload.user_id, get_username(payload.member))  # type: ignore
 
         # Game asked engine to change reactions
         if isinstance(output, engine.ChangeInputs):
-            await change_reactions(message, output.inputs)  # type: ignore
+            await change_reactions(message, output.inputs, bot)  # type: ignore
             output = output.frame
 
         # Frame remains the same
@@ -261,3 +287,66 @@ async def handle_raw_reaction(
 
     else:
         return None
+
+# This engine is pretty well written, or is it? (Squint eyes for easier ascii recognition)
+#                        .-=+*###%@@@@@@@@@@%#*=-.                           
+#                        @@@@#*+#-.      .::*#@@@@@*                         
+#                .+#@@@@@*.  .::--=--=-..:..     .@@@@@*=:                   
+#              -*@@@@:   -***#*##########%*++===.     #@@@#:                 
+#        .--==#@@+  :*%@@@@@@@@@%@@%%@@@%@#*#%##*+++:    %@@*:               
+#        =%@@@@:  #@@@%%%%%@%%%%%%%%@%%%@@@%%%%%%%%##*+.   @@@#.             
+#     =-+#@@%:  #%@%######%%%%%%#%%%%%@%%%%#%%%%%%%%@%#*=    @@@*            
+#     %%@@@: .#@%%#####%%%%%##%#%#####################%@%%+    @@*           
+#     @@@=..%@@%###########################%%#%#%#######%%%%+   *@#=         
+#     @@* :%%%################%%##%%%%%#############*###*#%@%#-  #@@*        
+#  =+%@# -%%#**######%%#####**##***+******#########*#******#%%#=: :@%        
+# -%%@@ -%%##*****##%#%%%%%%%%##%%%%%%%###%%%%##**##****#####%%*-. @@#       
+# -%@@ :%%#**#######****####*##########%%%########*#####****##%#*-. @@#=     
+# -%@: ##*####**++****##**##**++++++*+++++++++*********#####*###*-:  @@%*-   
+# -@@.=%****##*#*#*#######***%%%%%%##%%#%%##########*#####*****##*=- +@@%=   
+# -@@ #%#*****####*********###*##########*#####****#*####******##+== -@@*    
+# -@= ###*##*+*********###*********+*++++++****##**#####**#**####+-=: @@     
+# -@* #*+**#########################%%%%@%%###***####**###**#***#++=. @@*    
+# -@..#*++*****#***##%%###*****+***#*##***##****#**+********#***#+=-- @@#    
+# -@ .#*++++*+*+=*********#######*#*#**###############**********#*+=: @@%    
+# -@ =%++##%%%%%%%%%#*#**####*##########*#####%%%###%#%%#***#***###-: *@%-   
+# =@.*#+#%%%%%%%#%%%%%%#%###**#***++*####%%##%##%%%%%%%%%%%#*****#%=. +@@-   
+# *@ %##@#----::--:::-++*++****+*###+*==-:-:-::=::: .:-.=*%%#*****%=: *@@=   
+# %# %#%.                .-=+**+**=+=-::             ..    .*#*###%*- -@@#+-.
+# %@ %%%::-*#%%#=--:       :-==++***+==---+*+:....:-+*##%%#*#%#*=-.   %@@@@@-
+# @@:*   .-=-::-@@#%@%#**+==++%@@@%*=-.:+*+:.=%%#*#= .--.  .+#%%%%@@@@@+***@=
+# @    @@%*:  .%*    -=::--. ...   . -*-+=:-#@*= :%@@   -**    @@@@@+:=*%=.@+
+# @+  @@+==:--+%#....::   .=-  ***= +%+:- . .- :  .+#++-:-%%   +*:-  +##=  @=
+# @++ +@= .=+*++*###*=-=+++%  @@@@@ -%+=-##+=+#%%%%*++=**+%% :%#+=#-+%##=.-@=
+# @=++ @#=-+#*-:    .-=-:+%% +%%##%% *@#-.:==-...:::=+#%%#%* #%***%::-*@=:%@-
+# %*.@ @@#+=+*##*+==--=##%% =######%@ +##%#=-----=+**++++*@  %#++*#.+:-#%-@@-
+# %+-*%  *@@%##%##%@@@@@*. =%**#%##*#% .%@@%%@@%######%%@@  *%****+:@#====@@-
+# #=* %%#=:. .. ...      :##*+#%@#*=+%%=    ..::.:::.... :#%%#++*#- @*==-@@%-
+# *@% +*+*##***######**=*%#**+*##++*+*#@%#***##**###%%%#%%#**++++#-.%%#*=@@%-
+# =@@ :*=++*####*+=--=***++*######*##++++++*+==+++**+*******++++*#-.%%=.%%*- 
+# -%@# #++=+**==-=+#@%=+%%######%%%#*+#@@%--#%%*++=+*+**********#+ -#*=@@+   
+# -%@: ++==++++*#%%#=. *@#%#%%%###%%*###%%=- .+%%#*++++**=+*****#- -*=%@%=   
+# -%@@- -++++++*++-.  .==+##******#%#*##****+  .=****+++*#*******:  :=@@%+   
+#  -+@@@.++++====-. .+###  .===---:.--:.-+*#%**. .+#**+===+++*##+ %@@@*=-.   
+#     @@ *=++++=-.:+%%%#+==:...:+#%#=.:.+*#*%##%%-.-=++*====+*#+= +@@+       
+#     @@ *+++++=-=+*++---==-=::+-    .===+=+#%+==%#+===+*****=-:: @@%:       
+#     @@ +*++++***+++===:.. ::+-.:--::=: :--===:::+%##*+*=:-++-:  @@%:       
+#     @@  --+#**+:   ..::.:.. ..      .. =**=-:-:: -*##*-.:::==- *@@%        
+#     @@@  -:=#*:::::-+#%#++=--::::-++%%#@-# .  .::.-##*- -==-: -@@%%-       
+#     @@@  ::=#+::-=-.   :-+++@@@@@@%=@: .   .:..-:-=#%#. -+*=. @@*--.       
+#     %%@@  .-%#===..-=-                 :*##%%%+=:=%%%*:.-+-  *@#           
+#     :*@@*  :%%==::=*%%###*-=:.::..:-=#%%#**###=--:=-:::-==:  @@=           
+#        @@  .-=:::-+#****##%%%%##%#####*+****##+::.:-:::.:-  @@@=           
+#        #@@  :----=++=--+=-==+****++=++*%+=*##-:--.=%:.::-.  @@%=           
+#        -@@%  -:--..==*=-....::-=--..:  :**#*:.-==-==:::-. =@@+-            
+#        :@@@@ .:::-=*#+=-::.:-:.  ...::--*#**:::.-:::--:  .@@               
+#         *#@@   :---*###*==--..  .:.:*#***+=+--::--::::. -@@=               
+#          -#@@#  ::-:-=*#%#*+=++=#**==*%%+=------=::::   %@@:               
+#            *@@+  .::--:-==***==++**%#-==+=:-------:   .@@+-                
+#            .+@@@   .-+-+*+--+***-*=-#=-*=:-=---:     @@@                   
+#              .#@@=  .-::-*+==+=+=+=-++-.--:=::    %@@@+                    
+#                +@@@   :: :--=*+=+=+=-*=---:    @@@@%                       
+#                :#@@@:   :=:.--..-::::.=-.   #@@@@%+.                       
+#                    @@@:       ...:: .     @@@@                             
+#                    +@@@@@@             @@@@@                               
+#                     ==-=#@@@@@@@@@@@@@@@                                   
