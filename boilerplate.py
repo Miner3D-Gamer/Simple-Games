@@ -12,9 +12,6 @@ from custom_typing import (
 
 class Game:
 
-    def __call__(self, *args: Any, **kwds: Any) -> Any:
-        return self
-
     def __init__(self) -> None:
         "The logic that would usually go here is moved to the 'setup' function"
 

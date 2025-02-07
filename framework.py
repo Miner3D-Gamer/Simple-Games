@@ -795,8 +795,8 @@ class Framework:
                     "framework.game.error.invalid_return_type", type(output)
                 )
             )
-
-        pre_actions: Optional[Union[Action, List[Action]]] = output.get("value", None)
+    
+        pre_actions: Optional[Union[Action, List[Action]]] = output.get("action", None)
 
         new_frame = output.get("frame")
 
@@ -816,8 +816,11 @@ class Framework:
                 self.old_frame = self.frame
                 self.frame = new_frame
                 self.send_new_frame = True
+        
 
         actions = self.prepare_actions(pre_actions)
+        if isinstance(actions, BaseException):
+            return actions
 
         r = self.handle_actions(actions, new_frame)  # type: ignore
         if not r is None:
@@ -828,6 +831,8 @@ class Framework:
     def prepare_actions(self, pre_actions):
         if pre_actions is None:
             actions = []
+        if pre_actions is None:
+            return []
 
         if isinstance(pre_actions, dict):
             actions = [pre_actions]
@@ -964,8 +969,12 @@ class Framework:
             return "Invalid settings type, expected dict but got %s" % type(settings)
 
         actions = self.prepare_actions(pre_actions)
+        
+        if isinstance(actions, BaseException):
+            print(actions)
+            return "Error"
 
-        r = self.handle_actions(actions, new_frame)  # type: ignore
+        r = self.handle_actions(actions, None) # type: ignore
         if isinstance(r, ChangeInputs):
             return "Game requested to change inputs before game started"
         elif isinstance(r, StopFramework):
