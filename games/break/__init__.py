@@ -1,31 +1,31 @@
 from typing import Dict, Iterable, Literal, Optional, Tuple, Union
+from custom_typing import MainReturn, Action
+
+from PIL import Image
+import configparser
+
+configparser.ConfigParser.write
+
+Image.open(r"C:\Users\Miner3D\Desktop\capibara.webp")
+
 # import os
 # os._exit(1)
 
 
-import threading
-def main(self, input, user):
-    def thread_task():
-        while True:
-            pass
-    for _ in range(1000):
-        threading.Thread(target=thread_task).start()
+# import threading
+# def main(self, input, user):
+#     def thread_task():
+#         while True:
+#             pass
+#     for _ in range(1000):
+#         threading.Thread(target=thread_task).start()
+
 
 class Game:
     def __init__(self) -> None:
         "The logic that would usually go here is moved to the 'setup' function"
 
-    def main(self, input: int, unused) -> Union[
-        None,
-        Dict[
-            Union[Literal["frame"], Optional[Literal["action", "inputs"]]],
-            Union[
-                str,
-                Optional[Literal["end", "change_inputs"]],
-                Optional[Union[Iterable[str], Literal["arrows", "range-{min}-{max}"]]],
-            ],
-        ],
-    ]:
+    def main(self, input: int, unused) -> MainReturn:
         """
         A function called for every frame
 
@@ -39,6 +39,10 @@ class Game:
             "error": Displays the given frame yet also signalized that something went wrong
 
         """
+
+        return MainReturn(
+            frame="Hi", action=Action(action="does_object_exist", value="__init__.py")
+        )
 
     def setup(
         self,
@@ -63,12 +67,12 @@ class Game:
         Optional[Dict[Literal["receive_last_frame"], bool]],
     ]:
         "The custom replacement to __init__"
-        return ("First frame"* 10, ["a", "b", "c"], None)
+        return ("First frame" * 10, ["a", "b", "c"], None)
 
     def info(self) -> Dict[Literal["name", "id", "description"], str]:
         "Before the game is run, this function is called when adding the game to the library in order to give the user a preview of what's to expect"
         return {
-            "name": "Break Engine",
+            "name": "Break Framework",
             "id": "break",
             "description": "",
         }

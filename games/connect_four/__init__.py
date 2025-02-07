@@ -1,5 +1,5 @@
-import os
-os.system("cls")
+# import os
+# os.system("cls")
 size = (7, 6)
 
 board = []

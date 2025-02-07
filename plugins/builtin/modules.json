@@ -1,0 +1,109 @@
+{
+    "allowed": [
+        "abc",
+        "array",
+        "binascii",
+        "cmath",
+        "collections",
+        "contextlib",
+        "copy",
+        "dataclasses",
+        "decimal",
+        "difflib",
+        "enum",
+        "functools",
+        "graphlib",
+        "hashlib",
+        "heapq",
+        "itertools",
+        "json",
+        "math",
+        "numbers",
+        "operator",
+        "random",
+        "re",
+        "reprlib",
+        "statistics",
+        "string",
+        "struct",
+        "textwrap",
+        "timeit",
+        "typing",
+        "unicodedata",
+        "uuid",
+        "json",
+        "json5",
+        "hjson",
+        "yaml",
+        "tomli",
+        "configparser",
+        "hcl2",
+        "xml",
+        {
+            "tge": [
+                "manipulation",
+                "formatting_utils",
+                {
+                    "tbe": [
+                        "determine_affirmative",
+                        "number_to_words",
+                        "letter_to_number",
+                        "number_to_letter",
+                        "autocomplete",
+                        "is_iterable",
+                        "analyze_text",
+                        "divide",
+                        "generate_every_capitalization_states",
+                        "minify"
+                    ]
+                },
+                "random_generators",
+                {
+                    "file_operations": [
+                        "make_clean_filename",
+                        "decompress_file_paths",
+                        "compress_file_paths"
+                    ]
+                },
+                "bool_operations",
+                "validation",
+                "math_functions",
+                "conversion",
+                "codec"
+            ]
+        },
+        "custom_typing",
+        "ijson",
+        {
+            "os": [
+                {
+                    "path": [
+                        "join",
+                        "dirname",
+                        "abspath",
+                        "basename"
+                    ]
+                }
+            ]
+        },
+        {
+            "PIL": [
+                "Image"
+            ]
+        }
+    ],
+    "disabled": {
+        "PIL.Image": [
+            "open",
+            "save",
+            "show",
+            "frombytes",
+            "tobytes"
+        ],
+        "configparser.Configparser":[
+            "read",
+            "read_file",
+            "write"
+        ]
+    }
+}

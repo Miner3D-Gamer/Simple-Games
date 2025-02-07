@@ -26,6 +26,8 @@ games/world/__pycache__/__init__.cpython-311.pyc
 games/world/__pycache__/__init__.cpython-312.pyc
 wrapper/__pycache__/console.cpython-311.pyc
 wrapper/__pycache__/console_bios.cpython-311.pyc
+wrapper/__pycache__/import_patcher.cpython-311.pyc
+wrapper/__pycache__/other.cpython-311.pyc
 wrapper/__pycache__/shared.cpython-311.pyc
 wrapper/__pycache__/__init__.cpython-311.pyc
 __pycache__/console.cpython-311.pyc
@@ -38,6 +40,8 @@ __pycache__/discord.cpython-312.pyc
 __pycache__/discord_engine.cpython-311.pyc
 __pycache__/discord_input.cpython-311.pyc
 __pycache__/engine.cpython-311.pyc
+__pycache__/framework.cpython-311.pyc
+__pycache__/import_patcher.cpython-311.pyc
 __pycache__/lib.cpython-311.pyc
 __pycache__/lib.cpython-312.pyc
 __pycache__/player.cpython-311.pyc

@@ -52,3 +52,28 @@ def count_newlines(thing) -> int:
         return sum([count_newlines(x) for x in thing])
 
     raise ValueError(f"Type unimplemented: {type(thing)}")
+
+
+
+def check_type(value, expected_type) -> bool:
+    """Recursively checks if `value` matches `expected_type`"""
+    origin = get_origin(expected_type)
+    args = get_args(expected_type)
+
+    if origin is Union:  # Handle Union[X, Y, Z]
+        return any(check_type(value, arg) for arg in args)
+
+    if origin in {list, tuple}:  # Handle list[X] and tuple[X, ...]
+        if not isinstance(value, origin):
+            return False
+        if args:  # Ensure all elements match the contained type
+            return all(check_type(v, args[0]) for v in value)
+        return True
+
+    if origin is Literal:  # Handle Literal values
+        return value in args
+
+    if isinstance(value, expected_type):  # Handle normal type checking
+        return True
+
+    return False

@@ -1,13 +1,13 @@
 from typing import Optional, Union, Literal, Dict, TypedDict, List
-import engine
+import framework
 import discord_emoji
 import discord
 
 # Dictionary to store messages by their IDs
 
 
-class EngineDict(TypedDict):
-    engine: engine.Engine
+class FrameworkDict(TypedDict):
+    framework: framework.Framework
     ready: bool
 
 
@@ -24,7 +24,7 @@ class EasyDict(dict):
             return self.__dict__[key]
 
 
-message_store: Dict[int, EngineDict] = EasyDict()
+message_store: Dict[int, FrameworkDict] = EasyDict()
 
 from string import ascii_lowercase
 
@@ -191,33 +191,33 @@ async def handle_message(
         if len(args) > 1:
             await message.channel.send("Please provide only one argument.")
             return True
-        engine_instance = engine.Engine()
+        framework_instance = framework.Framework("discord")
 
         if len(args) == 1:
-            valid = engine.is_valid_game_id(args[0])
+            valid = framework.is_valid_game_id(args[0])
             if valid:
-                engine_instance.select_game(args[0])
+                framework_instance.select_game(args[0], "discord")
 
                 send = await message.channel.send(f"Selected: {args[0]}")
 
-                message_store[send.id]["engine"] = engine_instance
+                message_store[send.id]["framework"] = framework_instance
                 message_store[send.id]["ready"] = False
 
-                await change_reactions(send, engine_instance.accepted_inputs, bot)  # type: ignore
+                await change_reactions(send, framework_instance.accepted_inputs, bot)  # type: ignore
                 message_store[send.id]["ready"] = True
 
                 return True
         else:
             args = [""]
 
-        selected = engine_instance.select_game_from_user(message.author.name, args[0])
-        if isinstance(selected, engine.SelectedGame):
+        selected = framework_instance.select_game_from_user(message.author.name, args[0])
+        if isinstance(selected, framework.SelectedGame):
             send = await message.channel.send(f"Selected: {args[0]}")
 
-            message_store[send.id]["engine"] = engine_instance
+            message_store[send.id]["framework"] = framework_instance
             message_store[send.id]["ready"] = False
 
-            await change_reactions(send, engine_instance.accepted_inputs, bot)  # type: ignore
+            await change_reactions(send, framework_instance.accepted_inputs, bot)  # type: ignore
             message_store[send.id]["ready"] = True
         else:
             if isinstance(selected, Exception):
@@ -254,13 +254,13 @@ async def handle_raw_reaction(
         if not message_store[payload.message_id]["ready"]:
             return True
 
-        engine_instance = message_store[payload.message_id]["engine"]
+        framework_instance = message_store[payload.message_id]["framework"]
         reaction_str = convert_reaction_to_process(payload.emoji.name)  # type: ignore
 
-        output = engine_instance.run_game(reaction_str, payload.user_id, get_username(payload.member))  # type: ignore
+        output = framework_instance.run_game(reaction_str, payload.user_id, get_username(payload.member))  # type: ignore
 
-        # Game asked engine to change reactions
-        if isinstance(output, engine.ChangeInputs):
+        # Game asked framework to change reactions
+        if isinstance(output, framework.ChangeInputs):
             await change_reactions(message, output.inputs, bot)  # type: ignore
             output = output.frame
 
@@ -271,12 +271,12 @@ async def handle_raw_reaction(
         if isinstance(output, Exception):
             await message.edit(content=str(output))
             return True
-        # Game asked engine to stop
-        if isinstance(output, engine.StopEngine):
+        # Game asked framework to stop
+        if isinstance(output, framework.StopFramework):
             await message.edit(content=output.last_frame)
             message_store.pop(payload.message_id)
             return True
-        # Game asked engine to send new frame
+        # Game asked framework to send new frame
         if isinstance(output, str):
             # output = output.replace(" ", "ㅤ")
             output = "```%s```" % output
@@ -288,7 +288,7 @@ async def handle_raw_reaction(
     else:
         return None
 
-# This engine is pretty well written, or is it? (Squint eyes for easier ascii recognition)
+# This framework is pretty well written, or is it?
 #                        .-=+*###%@@@@@@@@@@%#*=-.                           
 #                        @@@@#*+#-.      .::*#@@@@@*                         
 #                .+#@@@@@*.  .::--=--=-..:..     .@@@@@*=:                   
@@ -350,3 +350,4 @@ async def handle_raw_reaction(
 #                    @@@:       ...:: .     @@@@                             
 #                    +@@@@@@             @@@@@                               
 #                     ==-=#@@@@@@@@@@@@@@@                                   
+# (Squint eyes for easier ascii recognition)

@@ -68,6 +68,6 @@ class Game:
     def generate_board(self, width:int, height:int, mine_count:int):
         string = ""
         
-        for w in width:
-            for h in height:
+        for w in range(width):
+            for h in range(height):
                 print(w, h)

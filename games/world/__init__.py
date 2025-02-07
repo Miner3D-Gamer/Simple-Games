@@ -13,6 +13,15 @@ from typing import (
 )
 import os
 import random
+from custom_typing import (
+    ExtraInfo,
+    MainReturn,
+    SetupInput,
+    INPUTS,
+    GameInfo,
+    Action,
+    AdvancedInputs,
+)
 
 
 class Layer:
@@ -154,17 +163,11 @@ class Game:
     def __init__(self) -> None:
         "The logic that would usually go here is moved to the 'setup' function"
 
-    def main(self, input: int, unsused) -> Union[
-        None,
-        Dict[
-            Union[Literal["frame"], Optional[Literal["action", "inputs"]]],
-            Union[
-                str,
-                Optional[Literal["end", "change_inputs"]],
-                Optional[Union[Iterable[str], Literal["arrows", "range-{min}-{max}"]]],
-            ],
-        ],
-    ]:
+    def main(
+        self,
+        input: int,
+        info: Optional[ExtraInfo],
+    ) -> Optional[MainReturn]:
         """
         A function called for every frame
 
@@ -215,32 +218,18 @@ class Game:
 
         view, depth = get_camera_view_horizontal(self.world, self.cam)
 
-        return {
-            "frame": slice_to_output(view, depth, self.cam, self.world)
-            + f"\n{input} {self.cam.x} {self.cam.y} {self.cam.z} {new_pos}"
-        }
+        return MainReturn(
+            frame=slice_to_output(view, depth, self.cam, self.world)
+            + f"\n{input} {self.cam.x} {self.cam.y} {self.cam.z} {new_pos}",
+            action=None,
+        )
 
     def setup(
         self,
-        info: Dict[
-            Literal[
-                "user",
-                "interface",
-                "language",
-            ],
-            Union[
-                str,
-                Literal["console", "discord"],
-                str,
-            ],
-        ],
+        info: SetupInput,
     ) -> Tuple[
         str,
-        Union[
-            Iterable[str],
-            Literal["arrows", "{min}-{max}"],
-        ],
-        Optional[Dict[Literal["receive_last_frame"], bool]],
+        INPUTS,
     ]:
         width = 20
 
@@ -283,8 +272,15 @@ class Game:
         self.cam = Camera(0, 0, 1, 7, 7, 7)
 
         self.formatting = "left"
-        # self.change_menu("main").popitem()[1]
-        return (self.main(6, {}).pop("frame"), {"presets": "arrows", "custom": ["q", "e", " "]}, None)  # type: ignore
+        
+        frame = self.main(6, None)
+        assert frame is not None
+        frame = frame.get("frame", "")
+        
+        return (
+            frame,
+            AdvancedInputs(presets="arrows", custom=["q", "e", " "]),
+        )
 
     def info(self) -> Dict[Literal["name", "id", "description"], str]:
         "Before the game is run, this function is called when adding the game to the library in order to give the user a preview of what's to expect"

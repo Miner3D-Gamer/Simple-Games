@@ -1,26 +1,28 @@
-from typing import Literal, Dict, Union, Iterable, Tuple, Optional, TypeAlias, TypedDict
-from custom_typing import ExtraInfo, Inputs
+from typing import Tuple, Optional, Any, Union, List
+from custom_typing import (
+    ExtraInfo,
+    MainReturn,
+    SetupInput,
+    INPUTS,
+    GameInfo,
+    Action,
+    AdvancedInputs,
+)
 
 
 class Game:
+
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        return self
+
     def __init__(self) -> None:
         "The logic that would usually go here is moved to the 'setup' function"
 
     def main(
         self,
         input: int,
-        info: ExtraInfo,
-    ) -> Union[
-        None,
-        Dict[
-            Union[Literal["frame"], Optional[Literal["action", "inputs"]]],
-            Union[
-                str,
-                Optional[Literal["end", "change_inputs"]],
-                Optional[Union[Iterable[str], Literal["arrows", "range-{min}-{max}"]]],
-            ],
-        ],
-    ]:
+        info: Optional[ExtraInfo],
+    ) -> Optional[MainReturn]:
         """
         A function called for every frame
 
@@ -37,33 +39,15 @@ class Game:
 
     def setup(
         self,
-        info: Dict[
-            Literal[
-                "user",
-                "interface",
-                "language",
-            ],
-            Union[
-                str,
-                Literal["console", "discord"],
-                str,
-            ],
-        ],
-    ) -> Tuple[
-        str,
-        Union[
-            Iterable[str],
-            Union[Literal["arrows", "range-{min}-{max}"], str],
-            Inputs
-        ],
-    ]:
+        info: SetupInput,
+    ) -> Tuple[str, INPUTS, Optional[Union[Action, List[Action]]]]:
         "The custom replacement to __init__"
-        return ("First frame", ["a", "b", "c"])
+        return ("First frame", ["a", "b", "c"], None)
 
-    def info(self) -> Dict[Literal["name", "id", "description"], str]:
+    def info(self) -> GameInfo:
         "Before the game is run, this function is called when adding the game to the library in order to give the user a preview of what to expect"
         return {
             "name": "Custom game",
             "id": "example_game",
-            "description": "A simple game",
+            "description": "A complex game",
         }

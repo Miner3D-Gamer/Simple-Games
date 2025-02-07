@@ -1,0 +1,25 @@
+{
+  special: {
+    ARROW_UP: '⬆',
+    ARROW_DOWN: '⬇',
+    ARROW_LEFT: '⬅',
+    ARROW_RIGHT: '➡'
+  },
+  keys: {
+    // wasd
+    w: 'ARROW_UP',
+    a: 'ARROW_LEFT',
+    s: 'ARROW_DOWN',
+    d: 'ARROW_RIGHT',
+    // Arrows
+    UP: 'ARROW_UP',
+    LEFT: 'ARROW_LEFT',
+    DOWN: 'ARROW_DOWN',
+    RIGHT: 'ARROW_RIGHT',
+    // VIM style
+    h: 'ARROW_LEFT',
+    j: 'ARROW_DOWN',
+    k: 'ARROW_UP',
+    l: 'ARROW_RIGHT'
+  }
+}

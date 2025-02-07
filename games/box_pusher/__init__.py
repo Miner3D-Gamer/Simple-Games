@@ -1,6 +1,7 @@
+raise Exception("No longer compatible with the current frameworks file security system")
 from typing import Literal, Dict, Union, Iterable, Tuple, List, Any, Optional
 
-import json, os
+import json
 from copy import deepcopy as copy
 from tge.manipulation.list_utils import decompress_list_of_lists
 import ijson
@@ -17,7 +18,7 @@ class Game:
         self.formatting = "left"
         self.menu_id = "main"
         self.current_action = "menu"
-        self.worlds_folder = os.path.dirname(__file__) + "/worlds"
+        self.worlds_folder = "worlds"
         self.current_world = ""
         self.current_world_selection_page = 0
         self.worlds_per_page = 6
@@ -704,5 +705,3 @@ class Game:
         }
 
 
-if __name__ == "__main__":
-    ...

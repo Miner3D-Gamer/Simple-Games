@@ -1,40 +1,112 @@
-from typing import Literal, Dict, Union, Iterable, Tuple, Optional, TypeAlias, TypedDict
+from typing import (
+    Any,
+    Literal,
+    Dict,
+    Union,
+    Iterable,
+    Tuple,
+    Optional,
+    TypeAlias,
+    TypedDict,
+    List,
+    get_origin,
+    get_args,
+)
 
 # class Requirements:
 #     modules:list[str]
 #     python_version: str
 
+
+class Preset(TypedDict):
+    name: str
+    value: str
+    type: Literal["literal", "code"]
+    inserts: Optional[List[Union[str, List[str]]]]
+    valid: Union[str, List[str]]
+
+
 class ExtraInfo(TypedDict):
     username: str
     user_id: str
     old_frame: str
-    frame: str
+    frame: int
     deltatime: float
     time_between_frame_start: float
+    file_request_data: Optional[
+        List[
+            Dict[Literal["type", "key", "value"], Optional[Union[List[str], str, bool]]]
+        ]
+    ]
+    container_width: Optional[int]
+    container_height: Optional[int]
 
-class Inputs(TypedDict):
+
+class FrameworkAdditionalInfo(TypedDict):
+    user_id: str
+    username: str
+    debug_mode: bool
+
+
+class AdvancedInputs(TypedDict):
     presets: Union[str, list[str]]
     custom: list[str]
 
+
+INPUTS: TypeAlias = Union[
+    Union[str, list[str], Tuple[str, ...]],
+    Union[Literal["arrows", "range-{min}-{max}", "{min}-{max}"], str],
+    AdvancedInputs,
+]
+
+
+class Action(TypedDict):
+    action: Literal[
+        "end",
+        "change_inputs",
+        "unset",
+        "get_file_contents",
+        "write_to_file",
+        "get_files_in_folder",
+        "rename_object",
+        "remove_object",
+        "make_folder",
+        "get_subfolders_in_folder",
+        "does_object_exist",
+    ]
+    value: Optional[Union[INPUTS, str, Dict[str, str]]]
+
+
+class MainReturn(TypedDict):
+    frame: str
+    action: Optional[Union[Action, List[Action]]]
+
+
+class SetupInput(TypedDict):
+    user: str
+    interface: Union[Literal["console", "discord"], str]
+    language: str
+
+
+class GameInfo(TypedDict):
+    name: str
+    id: str
+    description: str
+
+
 class Game:
+
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        return self
+
     def __init__(self) -> None:
         "The logic that would usually go here is moved to the 'setup' function"
 
     def main(
         self,
         input: int,
-        info: ExtraInfo,
-    ) -> Union[
-        None,
-        Dict[
-            Union[Literal["frame"], Optional[Literal["action", "inputs"]]],
-            Union[
-                str,
-                Optional[Literal["end", "change_inputs"]],
-                Optional[Union[Iterable[str], Literal["arrows", "range-{min}-{max}"]]],
-            ],
-        ],
-    ]:
+        info: Optional[ExtraInfo],
+    ) -> Optional[MainReturn]:
         """
         A function called for every frame
 
@@ -51,30 +123,12 @@ class Game:
 
     def setup(
         self,
-        info: Dict[
-            Literal[
-                "user",
-                "interface",
-                "language",
-            ],
-            Union[
-                str,
-                Literal["console", "discord"],
-                str,
-            ],
-        ],
-    ) -> Tuple[
-        str,
-        Union[
-            Iterable[str],
-            Union[Literal["arrows", "range-{min}-{max}"], str],
-            Inputs
-        ],
-    ]:
+        info: SetupInput,
+    ) -> Tuple[str, INPUTS, Optional[Union[Action, List[Action]]]]:
         "The custom replacement to __init__"
-        return ("First frame", ["a", "b", "c"])
+        return ("First frame", ["a", "b", "c"], None)
 
-    def info(self) -> Dict[Literal["name", "id", "description"], str]:
+    def info(self) -> GameInfo:
         "Before the game is run, this function is called when adding the game to the library in order to give the user a preview of what to expect"
         return {
             "name": "Custom game",

@@ -1,3 +1,4 @@
+# type: ignore
 import platform
 from custom_typing import *
 

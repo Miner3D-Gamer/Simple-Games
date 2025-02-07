@@ -19,3 +19,5 @@ def get_time_stamp() -> str:
         + ":"
         + pad_value(now.tm_sec, 2, "0")
     )
+def get_only_item_in_dict(dictionary: dict):
+    return next(iter(dictionary.items()))

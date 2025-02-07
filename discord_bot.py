@@ -10,7 +10,7 @@ intents.message_content = True  # Required to read message content
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-from discord_engine import handle_raw_reaction, handle_message
+from discord_runtime import handle_raw_reaction, handle_message
 
 
 @bot.event
