@@ -3,7 +3,6 @@ from custom_typing import (
     ExtraInfo,
     MainReturn,
     SetupInput,
-    INPUTS,
     GameInfo,
     Action,
     AdvancedInputs,
@@ -75,7 +74,7 @@ class Game:
     def setup(
         self,
         info: SetupInput,
-    ) -> Tuple[str, INPUTS, Optional[Union[Action, List[Action]]]]:
+    ) -> Tuple[str, list[str], Optional[Union[Action, List[Action]]]]:
         "The custom replacement to __init__"
         self.selected = 0
         self.min = 0
@@ -86,7 +85,7 @@ class Game:
         self.value = random.randint(self.min, self.max)
         return (
             "Guess a number between 0 and 100\n>",
-            AdvancedInputs(presets="0-9", custom=["BACKSPACE"," ", "-"]),
+            ["0-9", "BACKSPACE", " ", "-"],
             None,
         )
 

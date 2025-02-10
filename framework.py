@@ -1,11 +1,24 @@
 # For maximum compatibility
 # pip install pyyaml json5 tomli python-hcl2 pyhocon, hjson
 
+# TODO:
+# Multiple Screen Support
+# Frame type support (Ascii, Emoji, RGB (Image))
+# More Communications/Negotiation between Game <-Framework-> Runner - What does the Runner support? What does the Game require?
+# Sound support
+# Game versioning/More game metadata like categories/tags + Way to rate/review game
+# Let games communicate with one another? Grouped file system??
+# Automatic Updates of games
+
+# Misc:
+# Fix requirements.txt not checking if module is allowed to be run
+
 
 import os
 from typing import Literal, Dict, Union, Tuple, Optional, Any, List, Callable
 from custom_typing import *
 from wrapper.other import *
+from genex import GenEx
 
 ###### PATHS ######
 
@@ -43,7 +56,7 @@ def load_redirects(content):
     LOADED["redirects"].update(content)
 
 
-def update_inputs(content):
+def update_inputs(content, plugin: str):
 
     custom = content.get("custom", [])
     if isinstance(custom, str):
@@ -51,7 +64,9 @@ def update_inputs(content):
     elif isinstance(custom, list):
         LOADED["allowed_inputs"].extend(custom)
     else:
-        raise Exception("Invalid custom inputs")
+        raise Exception(
+            get_localization("framework.plugins.load.inputs.error.invalid_type", plugin)
+        )
 
     presets = content.get("presets", [])
     LOADED["input_presets"].extend(presets)
@@ -62,13 +77,13 @@ def update_allowed_modules(content):
     LOADED["blocked_functions"].update(content.get("disabled"))
 
 
-def load_plugin(path: str):
+def load_plugin(path: str, name: str):
     redirect_keys = file_config_content(path, "redirect_keys")
     if redirect_keys is not None:
         load_redirects(redirect_keys)
     load_inputs = file_config_content(path, "load_inputs")
     if load_inputs is not None:
-        update_inputs(load_inputs)
+        update_inputs(load_inputs, name)
     load_allowed_modules = file_config_content(path, "modules")
     if load_allowed_modules is not None:
         update_allowed_modules(load_allowed_modules)
@@ -77,7 +92,7 @@ def load_plugin(path: str):
 def reload_plugins(plugin_folder):
     all_plugin_folders = os.listdir(plugin_folder)
     for plugin_folders in all_plugin_folders:
-        load_plugin(os.path.join(plugin_folder, plugin_folders))
+        load_plugin(os.path.join(plugin_folder, plugin_folders), plugin_folders)
 
 
 ##### Import patcher needs to be the first thing that get's loaded so it can do it's job as intented
@@ -101,7 +116,6 @@ from copy import deepcopy
 import traceback
 import sys
 import time
-import json
 import re
 import shutil
 import ast
@@ -196,116 +210,121 @@ def add_input_to_list(key_input: str, current_game: str):
         f.write(f"{key_input}\n")
 
 
-def load_inputs(inputs: INPUTS) -> Tuple[List[str], str]:
-    if isinstance(inputs, tuple):
-        new_inputs: List[str] = []
-        for key_input in inputs:
-            internal_inputs, err = load_inputs(key_input)
-            if err:
-                return [], err
-            new_inputs.extend(internal_inputs)
+def does_string_abide_regex(string: str, regex: str):
+    compiled = re.compile(regex)
+    return not compiled.match(string) is None
 
-        return new_inputs, ""
-    elif isinstance(inputs, str):
-        if inputs.__contains__("-"):
-            if inputs[0].isdigit() or inputs.startswith("range"):
-                if inputs.startswith("range"):
-                    inputs = inputs[6:]
-                inputs = inputs.strip("()")
-                inputs = inputs.split("-", 1)
-                if len(inputs) != 2:
-                    return (
-                        [],
-                        get_localization(
-                            "framework.load_input.error.invalid_number_range", inputs
-                        ),
-                    )
 
-                if not (inputs[0].isdigit() or inputs[1].isdigit()):
-                    return [], get_localization(
-                        "framework.load_input.error.not_numbers", inputs
-                    )
+def act_out_preset(
+    string: str, value: str, type: str, inserts: Union[str, List[str]], split: str
+) -> List[str]:
+    generated = value
 
-                def convert(x: str, which: str) -> Union[str, int]:
-                    val = try_convert(x)
-                    w = (
-                        get_localization("framework.load_input.error.first")
-                        if which == "first"
-                        else get_localization("framework.load_input.error.second")
-                    )
-                    if not isinstance(val, int):
-                        return get_localization(
-                            "framework.load_input.error.value_not_number", w, val
-                        )
-                    if 0 > val or val > 9:
-                        return get_localization(
-                            "framework.load_input.error.value_out_of_range", w, val
-                        )
-                    return val
-
-                def try_convert(x):
-                    try:
-                        return int(x)
-                    except ValueError:
-                        return (x,)
-
-                start = convert(inputs[0], "first")
-
-                end = convert(inputs[1], "second")
-
-                if isinstance(start, str):
-                    return [], start
-                if isinstance(end, str):
-                    return [], end
-
-                inputs = [
-                    str(x) for x in [*range(start, end + 1, 1 if start < end else -1)]
-                ]
-            else:
-                return [], get_localization(
-                    "framework.load_input.error.expected_number_range", inputs
+    inser_amount = len(inserts)
+    c = generated.count("%s")
+    if c != inser_amount:
+        raise Exception(
+            "Invalid preset, expected %s inserts, got %s from %s"
+            % (c, inser_amount, value)
+        )
+    else:
+        extracted = []
+        for i in inserts:
+            e = re.match(i, string)
+            if e is None:
+                raise Exception(
+                    "Insert couldn't be extracted from %s even though it had met the 'valid' regex defined earlier"
+                    % string
                 )
+            extracted.append(e.group(1))
+        generated = generated % tuple(extracted)
+
+    if type == "literal":
+        if split is None:
+            return [generated]
+        elif split:
+            return generated.split(split)
         else:
-            defaults = {"arrows": [*"⬅⬆⬇➡"]}
+            return list(generated)
+    elif type == "genex":
+        temp: tge.function_utils.TimeoutResult | str | Any = (
+            tge.function_utils.run_function_with_timeout(
+                GenEx, default_timeout, generated
+            )
+        )
+        if isinstance(temp, tge.function_utils.TimeoutResult):
+            raise Exception("GenEx timed out generating '%s'" % value)
 
-            inputs = defaults.get(inputs, "")
-            # raise BaseException("Hi, please report me. Dev forgot to test me \n%s"%tbh)
+        if split is None:
+            return [temp]
+        elif split:
+            return temp.split(split)
+        else:
+            return list(temp)
 
-            if inputs == "":
-                raise ValueError("Invalid input preset")
-    elif isinstance(inputs, dict):
-        presets: Union[str, list[str]] = inputs.get("presets", [])
-        custom: list[str] = inputs.get("custom", [])
-        if not tge.tbe.is_iterable(presets):
-            return [], "Preset is not iterable"
+    raise Exception("Invalid preset type %s, expected literal or genex" % type)
 
-        if not tge.tbe.is_iterable(custom):
-            return [], "Custom input is not iterable"
 
-        preset_inputs = load_inputs(presets)
-        if preset_inputs[1]:
-            return [], preset_inputs[1]
-
-        custom_inputs = load_inputs(custom)
-        if custom_inputs[1]:
-            return [], custom_inputs[1]
-
-        return preset_inputs[0] + custom_inputs[0], ""
-
-    elif not tge.tbe.is_iterable(inputs):
-        return [], "Inputs are not iterable"
-
+def load_inputs(inputs: Union[str, List[str]]) -> Union[List[str], Exception]:
+    final = []
     if isinstance(inputs, str):
-        return [], "Invalid input preset"
+        inputs = [inputs]
 
-    inv = []
     for inp in inputs:
-        if not inp in LOADED["allowed_inputs"]:
-            inv.append(inp)
-    if len(inv) > 0:
-        return [], "Invalid inputs: %s" % inv
-
-    return inputs, ""
+        if not isinstance(inp, str):
+            return Exception(
+                get_localization(
+                    "framework.load_input.error.input_in_inputs_is_not_str",
+                    inputs,
+                    type(inputs),
+                ),
+            )
+        for preset in LOADED["input_presets"]:
+            valid = preset.get("valid", None)
+            if not valid is None:
+                if does_string_abide_regex(inp, preset.get("valid", "")):
+                    inserts = preset.get("inserts", None)
+                    if inserts is None:
+                        inserts = []
+                    final.extend(
+                        act_out_preset(
+                            inp,
+                            preset["value"],
+                            preset["type"],
+                            inserts,
+                            preset["split"],
+                        )
+                    )
+            else:
+                c = preset.get("conditions", [])
+                if c is None:
+                    c = []
+                for condition in c:
+                    required_to_be_valid = condition.get("valid", [])
+                    if isinstance(required_to_be_valid, str):
+                        required_to_be_valid = [required_to_be_valid]
+                    if any(
+                        [does_string_abide_regex(inp, v) for v in required_to_be_valid]
+                    ):
+                        final.extend(
+                            act_out_preset(
+                                inp,
+                                preset["value"],
+                                preset["type"],
+                                condition["inserts"],
+                                preset["split"],
+                            )
+                        )
+                        break
+                else:
+                    continue
+                break
+        else:
+            if inp in LOADED["allowed_inputs"]:
+                final.append(inp)
+            else:
+                return Exception(get_localization("framework.load_input.error.input_not_allowed", inp))
+    return final
 
 
 def add_game_to_game_list(game: Game, interface: str):
@@ -395,7 +414,7 @@ class StopFramework(Exception):
     __slots__ = ("last_frame",)
 
     def __init__(self, last_frame: str) -> None:
-        self.last_frame = last_frame
+        super().__init__(last_frame)
 
 
 class SelectedGame:
@@ -418,7 +437,7 @@ class ChangeInputs:
 
 
 class SafeFileAccess:
-    def __init__(self, game_paths: list[str]) -> None:
+    def __init__(self, game_paths: List[str]) -> None:
         self.game_paths = game_paths
 
     def get_path_of_game(self, game_id) -> Optional[str]:
@@ -593,7 +612,9 @@ class Framework:
     ):
         error = self.select_game(game_id, interface)
         if error:
-            raise Exception(error)
+            if not isinstance(error, Exception):
+                raise Exception(error)
+            raise error
 
     def set_container_size(self, size: Tuple[Optional[int], Optional[int]]):
         if not size[0] is None:
@@ -605,7 +626,9 @@ class Framework:
         self, user_input: str, info: Union[Dict, FrameworkAdditionalInfo]
     ) -> Optional[Union[Exception, str, StopFramework, ChangeInputs]]:
         if not self.ready:
-            return Exception("Framework is not ready -> No game has been loaded")
+            return Exception(
+                get_localization("framework.intermediet_interaction.no_game_loaded")
+            )
         end, start = 0.0, 0.0
         self.frame_count += 1
         if self.frame_count == 0:
@@ -613,7 +636,11 @@ class Framework:
         self.time_between_frame = self.time_between_frame_start - time.time()
 
         if not isinstance(info, dict):
-            raise ValueError("Framework info ")
+            raise ValueError(
+                get_localization(
+                    "framework.intermediet_interaction.error.info_not_dict"
+                )
+            )
         else:
             debug_mode_enabled = info.get("debug_mode", False)
             user_id = info.get("user_id", "")
@@ -648,12 +675,13 @@ class Framework:
         #     add_input_to_list(original_user_input, self.game_id)
 
         file_input: Optional[
-        List[
-            Dict[Literal["type", "key", "value"], Optional[Union[List[str], str, bool]]]
-        ]
-    ] = (
-            []
-        )
+            List[
+                Dict[
+                    Literal["type", "key", "value"],
+                    Optional[Union[List[str], str, bool]],
+                ]
+            ]
+        ] = []
         for idx in range(len(self.queue)):
             i = self.queue.pop(0)
             if i:
@@ -795,7 +823,7 @@ class Framework:
                     "framework.game.error.invalid_return_type", type(output)
                 )
             )
-    
+
         pre_actions: Optional[Union[Action, List[Action]]] = output.get("action", None)
 
         new_frame = output.get("frame")
@@ -816,7 +844,6 @@ class Framework:
                 self.old_frame = self.frame
                 self.frame = new_frame
                 self.send_new_frame = True
-        
 
         actions = self.prepare_actions(pre_actions)
         if isinstance(actions, BaseException):
@@ -876,13 +903,18 @@ class Framework:
                             "\nReceived invalid input request when application tried changing inputs"
                         )
                     if isinstance(requested_value, (str, list)):
-                        self.accepted_inputs, errors = load_inputs(requested_value)
+                        temp = load_inputs(requested_value)
+                        if isinstance(temp, BaseException):
+                            return temp
+                        self.accepted_inputs = (
+                            tge.manipulation.list_utils.remove_duplicates(temp)
+                        )
 
-                        if errors:
-                            return Exception(
-                                "\nReceived invalid input request when application tried changing inputs: %s"
-                                % errors
-                            )
+                        # if errors:
+                        #     return Exception(
+                        #         "\nReceived invalid input request when application tried changing inputs: %s"
+                        #         % errors
+                        #     )
                         return ChangeInputs(self.accepted_inputs, self.frame)
                     else:
                         return Exception(
@@ -893,7 +925,7 @@ class Framework:
                     pass
                 elif action in [
                     "get_file_contents",
-                    "set_file_contents",
+                    "write_to_file",
                     "get_files_in_folder",
                     "rename_object",
                     "remove_object",
@@ -916,7 +948,7 @@ class Framework:
 
     def select_game(
         self, game_id: Union[str, Tuple[str, Game]], interface: str
-    ) -> Optional[str]:
+    ) -> Optional[Union[str, Exception]]:
         if isinstance(game_id, str):
             global GAMES
             try:
@@ -966,31 +998,37 @@ class Framework:
         if not isinstance(frame, str):
             return "Invalid frame type, expected string but got %s" % type(frame)
         if not isinstance(settings, dict):
-            return "Invalid settings type, expected dict but got %s" % type(settings)
+            return "Invalid settings type, expected dict but got %s (%s)" % (
+                type(settings),
+                settings,
+            )
 
         actions = self.prepare_actions(pre_actions)
-        
-        if isinstance(actions, BaseException):
-            print(actions)
-            return "Error"
 
-        r = self.handle_actions(actions, None) # type: ignore
+        if isinstance(actions, BaseException):
+            return actions
+
+        r = self.handle_actions(actions, None)  # type: ignore
         if isinstance(r, ChangeInputs):
             return "Game requested to change inputs before game started"
         elif isinstance(r, StopFramework):
             return "Game requested to end before even starting"
         elif isinstance(r, Exception):
             return "Exception during action execution during game setup"
-
-        accepted_inputs, errors = load_inputs(requested_inputs)
-        if errors:
-            return (
-                "Received invalid input request while trying to load game: %s" % errors
-            )
+        temp = load_inputs(requested_inputs)
+        if isinstance(temp, BaseException):
+            return temp
+        accepted_inputs = temp
+        # if errors:
+        #     return (
+        #         "Received invalid input request while trying to load game: %s" % errors
+        #     )
         self.first_frame = frame
         self.frame_count = -1
         self.game = game
-        self.accepted_inputs = accepted_inputs
+        self.accepted_inputs = tge.manipulation.list_utils.remove_duplicates(
+            accepted_inputs
+        )
         self.ready = True
         self.frame = ""
         self.old_frame = ""
@@ -1090,7 +1128,7 @@ class Framework:
 #         stuff = select_game(game_id)
 #         if isinstance(stuff, str):
 #             wait_for_async_function(
-#                 send, id, get_localization("framework.game.start.error", stuff)
+#                 send, id, get_localization("framework.game.error.setup_unwilling_to_cooperate", stuff)
 #             )
 #             request_input()
 #             continue
@@ -1165,8 +1203,8 @@ def remove_comment_from_line(line: str):
     return line.split("#")[0].rstrip()
 
 
-def is_module_allowed(modules: list[str], game_id: str, line_id: int):
-    def is_module_in_allowed_modules(module: list[str], allowed: RecursiceModuleType):
+def is_module_allowed(modules: List[str], game_id: str, line_id: int):
+    def is_module_in_allowed_modules(module: List[str], allowed: RecursiceModuleType):
         for item in allowed:
             if isinstance(item, str):
                 if item == module[0]:
@@ -1198,7 +1236,7 @@ def check_line_for_allowed_imports(game_id: str, line: str, line_id: int) -> str
     check_if_sub_import = re.compile(r"^\s*from\s+\w+\s+import\s+[\w\s,()]+")
     extract_root = re.compile(r"^\s*(?:import|from)\s+(\w+)")
     extract_sub_module = re.compile(r"^\s*from\s+\w+\s+import\s+([\w\s,()]+)")
-    modules: list[str]
+    modules: List[str]
     if check_if_normal.match(line):
         module = extract_root.match(line)
         assert module is not None
@@ -1219,7 +1257,7 @@ def check_line_for_allowed_imports(game_id: str, line: str, line_id: int) -> str
     return is_module_allowed(modules, game_id, line_id)
 
 
-def split_python_file_by_lines(file_content: str) -> list[str]:
+def split_python_file_by_lines(file_content: str) -> List[str]:
     """
     Split a Python file content into logical lines, handling both newlines and semicolons.
     Properly handles semicolons inside comments and strings.
@@ -1228,7 +1266,7 @@ def split_python_file_by_lines(file_content: str) -> list[str]:
         file_content (str): The content of the Python file as a string
 
     Returns:
-        list[str]: A list of strings, where each string is a logical line from the file
+        List[str]: A list of strings, where each string is a logical line from the file
     """
     # First split by newlines
     newline_split = file_content.splitlines()
@@ -1354,7 +1392,6 @@ def initialize_games():
                     # copy dir into other cache folder
                     full_dir = os.path.join(root, dir)
                     copy_game_to_cache(full_dir)
-                    # print(full_dir)
 
                     files = find_all_files(default_cache_folder)
                     get_out = True

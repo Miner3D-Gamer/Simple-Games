@@ -1,5 +1,5 @@
 import random
-from custom_typing import SetupInput, INPUTS, MainReturn, Action
+from custom_typing import SetupInput, MainReturn, Action
 from typing import Any
 from typing import Literal, Dict, Tuple, Optional
 from custom_typing import ExtraInfo, AdvancedInputs
@@ -133,7 +133,7 @@ class Game:
                         time_between_frame_start=0,
                         file_request_data=None,
                         container_height=info.get("container_height"),
-                        container_width=info.get("container_width")
+                        container_width=info.get("container_width"),
                     ),
                 )
                 if rt is None:
@@ -249,7 +249,7 @@ class Game:
                         time_between_frame_start=0,
                         file_request_data=None,
                         container_height=info.get("container_height"),
-                        container_width=info.get("container_width")
+                        container_width=info.get("container_width"),
                     ),
                 )
                 if rt is None:
@@ -357,9 +357,9 @@ class Game:
                     frame=0,
                     deltatime=0,
                     time_between_frame_start=0,
-                        file_request_data=None,
-                        container_height=info.get("container_height"),
-                        container_width=info.get("container_width")
+                    file_request_data=None,
+                    container_height=info.get("container_height"),
+                    container_width=info.get("container_width"),
                 ),
             )
             if next is None:
@@ -381,9 +381,9 @@ class Game:
                 frame=0,
                 deltatime=0,
                 time_between_frame_start=0,
-                        file_request_data=None,
-                        container_height=info.get("container_height"),
-                        container_width=info.get("container_width")
+                file_request_data=None,
+                container_height=info.get("container_height"),
+                container_width=info.get("container_width"),
             ),
         )
 
@@ -424,7 +424,7 @@ class Game:
         info: SetupInput,
     ) -> Tuple[
         str,
-        INPUTS,
+        list[str],
     ]:
         "The custom replacement to __init__"
         self.all = {}
@@ -457,4 +457,3 @@ class Game:
             "id": "blackjack",
             "description": "I'm not addicted, but I can still play some blackjack",
         }
-

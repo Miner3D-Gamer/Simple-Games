@@ -17,7 +17,6 @@ from custom_typing import (
     ExtraInfo,
     MainReturn,
     SetupInput,
-    INPUTS,
     GameInfo,
     Action,
     AdvancedInputs,
@@ -229,7 +228,7 @@ class Game:
         info: SetupInput,
     ) -> Tuple[
         str,
-        INPUTS,
+        list[str],
     ]:
         width = 20
 
@@ -279,7 +278,7 @@ class Game:
         
         return (
             frame,
-            AdvancedInputs(presets="arrows", custom=["q", "e", " "]),
+            ["arrows", "q", "e", " "],
         )
 
     def info(self) -> Dict[Literal["name", "id", "description"], str]:

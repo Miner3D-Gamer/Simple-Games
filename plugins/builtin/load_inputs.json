@@ -4,31 +4,43 @@
             "name": "arrows",
             "type": "literal",
             "value": "⬅⬆⬇➡",
+            "split": "",
             "valid": "arrows$"
         },
         {
             "name": "range",
-            "type": "code",
-            "value": "range(%s, %s)",
-            "inserts": [
-                [
-                    "^range\\((\\d+),",
-                    "^range\\((\\d+)-",
-                    "^range-(\\d+)-",
-                    "^(\\d+)-"
-                ],
-                [
-                    "range\\(\\d+,\\s*(\\d+)\\)$",
-                    "range\\(\\d+-(\\d+)\\)$",
-                    "range-\\d+-(\\d+)$",
-                    "\\d+-(\\d+)$"
-                ]
-            ],
-            "valid": [
-                "range\\((\\d+),\\s*(\\d+)\\)",
-                "range\\((\\d+)-(\\d+)\\)",
-                "range-(\\d+)-(\\d+)",
-                "(\\d+)-(\\d+)"
+            "type": "genex",
+            "value": "join(range('%s', '%s'), ',')",
+            "split": ",",
+            "conditions": [
+                {
+                    "valid": "range\\((\\d+),\\s*(\\d+)\\)",
+                    "inserts": [
+                        "^range\\((\\d+),",
+                        "range\\(\\d+,\\s*(\\d+)\\)$"
+                    ]
+                },
+                {
+                    "valid": "range\\((\\d+)-(\\d+)\\)",
+                    "inserts": [
+                        "^range\\((\\d+)-",
+                        "range\\(\\d+-(\\d+)\\)$"
+                    ]
+                },
+                {
+                    "valid": "range-(\\d+)-(\\d+)",
+                    "inserts": [
+                        "^range-(\\d+)-",
+                        "range-(\\d+)-(\\d+)$"
+                    ]
+                },
+                {
+                    "valid": "(\\d+)-(\\d+)",
+                    "inserts": [
+                        "^(\\d+)-",
+                        "\\d+-(\\d+)$"
+                    ]
+                }
             ]
         }
     ],

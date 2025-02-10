@@ -1,3 +1,16 @@
-from .keyboard.linux import hold_key as hold_key, is_key_pressed as is_key_pressed, key_to_virtual_key as key_to_virtual_key, keys as keys, press_key as press_key, release_key as release_key
-
-__all__ = ['is_key_pressed', 'press_key', 'hold_key', 'release_key', 'key_to_virtual_key', 'keys']
+from _typeshed import Incomplete
+from typing import Protocol
+__all__=['is_key_pressed','press_key','hold_key','release_key','key_to_virtual_key','keys']
+class KeyboardModule(Protocol):
+	def is_key_pressed(self,key:str)->bool:...
+	def press_key(self,key:str)->None:...
+	def hold_key(self,key:str)->None:...
+	def release_key(self,key:str)->None:...
+	def key_to_virtual_key(self,key:str)->int:...
+	keys:dict[str,int]
+is_key_pressed:Incomplete
+press_key:Incomplete
+hold_key:Incomplete
+release_key:Incomplete
+key_to_virtual_key:Incomplete
+keys:Incomplete

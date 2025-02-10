@@ -3,13 +3,13 @@ from importlib import import_module, util
 from types import ModuleType
 from importlib.abc import MetaPathFinder, Loader
 from importlib.machinery import ModuleSpec
-
+from typing import Dict, List, Union
 
 from wrapper.shared import get_only_item_in_dict
 
 
 class ModuleLoader(Loader):
-    def __init__(self, original_spec, replace: dict[str, list[str | dict[str, str]]]):
+    def __init__(self, original_spec, replace: Dict[str, List[Union[str, Dict[str, str]]]]):
         self.original_spec = original_spec
         self.replace = replace
 
@@ -95,7 +95,7 @@ class ModulePatch(MetaPathFinder):
         return None
 
 
-def block_modules(module: dict[str, list[str]]):
+def block_modules(module: Dict[str, List[str]]):
     sys.meta_path.insert(0, ModulePatch(module))
 
 

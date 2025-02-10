@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, Dict
 
 def pad_value(val: Any, how_many: int, char: str) -> str:
     return str(val).rjust(how_many, char)
@@ -19,5 +19,5 @@ def get_time_stamp() -> str:
         + ":"
         + pad_value(now.tm_sec, 2, "0")
     )
-def get_only_item_in_dict(dictionary: dict):
+def get_only_item_in_dict(dictionary: Dict):
     return next(iter(dictionary.items()))

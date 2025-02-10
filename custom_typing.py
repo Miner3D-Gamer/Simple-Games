@@ -14,17 +14,27 @@ from typing import (
 )
 
 # class Requirements:
-#     modules:list[str]
+#     modules:List[str]
 #     python_version: str
+
+
+class FrameworkAdditionalInfo(TypedDict):
+    user_id: str
+    username: str
+    debug_mode: bool
 
 
 class Preset(TypedDict):
     name: str
     value: str
-    type: Literal["literal", "code"]
-    inserts: Optional[List[Union[str, List[str]]]]
-    valid: Union[str, List[str]]
+    type: Literal["literal", "genex"]
+    conditions: Optional[List[Dict[str, Union[str, List[str]]]]]
+    split: str
+    inserts: Optional[str]
 
+
+class SetupSettings(TypedDict):
+    ...
 
 class ExtraInfo(TypedDict):
     username: str
@@ -42,22 +52,17 @@ class ExtraInfo(TypedDict):
     container_height: Optional[int]
 
 
-class FrameworkAdditionalInfo(TypedDict):
-    user_id: str
-    username: str
-    debug_mode: bool
-
-
 class AdvancedInputs(TypedDict):
-    presets: Union[str, list[str]]
-    custom: list[str]
+    type: Literal["preset", "custom"]
+    value: Union[str, List[str]]
 
 
-INPUTS: TypeAlias = Union[
-    Union[str, list[str], Tuple[str, ...]],
-    Union[Literal["arrows", "range-{min}-{max}", "{min}-{max}"], str],
-    AdvancedInputs,
-]
+# INPUTS: TypeAlias = List[str]
+# INPUTS: TypeAlias = Union[
+#     Union[str, List[str], Tuple[str, ...]],
+#     Union[Literal["arrows", "range-{min}-{max}", "{min}-{max}"], str],
+#     List[AdvancedInputs],
+# ]
 
 
 class Action(TypedDict):
@@ -74,12 +79,13 @@ class Action(TypedDict):
         "get_subfolders_in_folder",
         "does_object_exist",
     ]
-    value: Optional[Union[INPUTS, str, Dict[str, str]]]
+    value: Optional[Union[List[str], str, Dict[str, str]]]
 
 
 class MainReturn(TypedDict):
     frame: str
     action: Optional[Union[Action, List[Action]]]
+
 
 
 class SetupInput(TypedDict):
@@ -100,7 +106,7 @@ class Game:
         return self
 
     def __init__(self) -> None:
-        "The logic that would usually go here is moved to the 'setup' function"
+        "The logic that would usually go here is moved to the 'setup' function. Type annotation may be used here."
 
     def main(
         self,
@@ -110,23 +116,34 @@ class Game:
         """
         A function called for every frame
 
-        None: Something went wrong yet instead of raising an error, None can be returned to signalize that the game loop should be stopped
+        To signal an error, raise an Exeption anytime, or use quit()/return None to signalize something went wrong without any debug info
 
         Actions:
-            "end": Displays the last frame and ends the game loop
+            Misc:
+                "end": Displays the last frame and ends the game loop
+                "change_inputs": Uses the 'values' field. Changes the inputs if possible
+                "unset": Does nothing, can be used when returning None for the action would be inconvinient
 
-            "change_inputs": Requires another variable neighboring 'actions'; 'inputs'. Changes the inputs if possible
-
-            "error": Displays the given frame yet also signalized that something went wrong
-
+            I/O:
+                "get_file_contents": Uses the 'values' (str) field. Get the file contents as string or None if the file doesn't exist
+                "write_to_file": Uses the 'values' ({path : content}) field. Creates and writes to a file
+                "get_files_in_folder": Uses the 'values' (str) field. Returns all files in a directory as List[str] or None if the directory doesn't exist
+                "rename_object": Uses the 'values' ({path : content}) field. Rename a file or folder
+                "remove_object": Uses the 'values' (str) field. Deletes a file or folder, returns boolean if successful and None if the file doesn't exist
+                "make_folder": Uses the 'values' (str) field. Creates a folder
+                "get_subfolders_in_folder": : Uses the 'values' (str) field. Returns all folders in a directory as List[str] or None if the directory doesn't exist
+                "does_object_exist": Uses the 'values' (str) field. Returns a boolean if a folder or file exist
         """
 
     def setup(
         self,
         info: SetupInput,
-    ) -> Tuple[str, INPUTS, Optional[Union[Action, List[Action]]]]:
-        "The custom replacement to __init__"
-        return ("First frame", ["a", "b", "c"], None)
+    ) -> Tuple[str, List[str], Optional[SetupSettings], Optional[Union[Action, List[Action]]]]:
+        """
+        The custom replacement to __init__.
+        I/O actions can be used here to set up settings or get files before the user interacts with the game.
+        """
+        return ("First frame", ["a", "b", "c"], None, None)
 
     def info(self) -> GameInfo:
         "Before the game is run, this function is called when adding the game to the library in order to give the user a preview of what to expect"

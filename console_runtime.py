@@ -3,7 +3,7 @@ import tge
 import os
 from wrapper.console_bios import wait_for_key, send
 from typing import Optional, Union
-
+# Scroll to the bottom for the player
 
 def to_console(
     game_output: Optional[
@@ -40,7 +40,7 @@ def to_console(
     if isinstance(game_output, framework.StopFramework):
         # Game or Framework requested to stop
         tge.console.clear()
-        old_frame = game_output.last_frame + "\nEnd."
+        old_frame = game_output.args[0] + "\nEnd."
         send(old_frame)
         quit()
 
@@ -118,6 +118,9 @@ def set_user(params):
     global user
     user = params[0]
 
+
+
+###### PLAYER BEGINS HERE #####
 
 def get_console_size():
     return os.get_terminal_size().columns, 0

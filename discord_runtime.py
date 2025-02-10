@@ -143,7 +143,7 @@ async def remove_reactions(
 async def change_reactions(
     message: discord.Message,
     reactions: List[
-        Union[discord.GuildEmoji, discord.AppEmoji, discord.PartialEmoji, str]
+        Union[discord.PartialEmoji, str]
     ],
     bot: discord.bot.Bot,
 ):
